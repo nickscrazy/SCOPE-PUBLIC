@@ -1,0 +1,7 @@
+
+> scope-intelligence@0.1.0 db:migrate
+> tsx --env-file-if-exists=.env server/migrate.ts
+
+.env not found. Continuing without it.
+.env not found. Continuing without it.
+Database migrations applied.

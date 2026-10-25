@@ -1,0 +1,58 @@
+{
+  "name": "scope-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env server/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env server/seed.ts",
+    "sync:ted": "NODE_USE_ENV_PROXY=1 tsx --env-file-if-exists=.env server/sync.ts",
+    "import:grants": "tsx --env-file-if-exists=.env server/import-grants.ts",
+    "build": "tsc --noEmit && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/server.js && esbuild server/migrate.ts server/seed.ts server/sync.ts server/import-grants.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "db:migrate:prod": "node --env-file-if-exists=.env dist/migrate.js",
+    "db:seed:prod": "node --env-file-if-exists=.env dist/seed.js",
+    "sync:ted:prod": "NODE_USE_ENV_PROXY=1 node --env-file-if-exists=.env dist/sync.js",
+    "import:grants:prod": "node --env-file-if-exists=.env dist/import-grants.js",
+    "smoke:prod": "tsx scripts/smoke-production.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.0",
+    "@fontsource-variable/manrope": "^5.2.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.9.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.34.0",
+    "@playwright/test": "^1.55.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/supertest": "^6.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.34.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.41.0",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0"
+  }
+}

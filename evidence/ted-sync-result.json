@@ -1,0 +1,8 @@
+{
+  "status": "success",
+  "count": 90,
+  "totalAvailable": 347,
+  "query": "buyer-country = MLT AND publication-date >= 20260727 AND notice-type = cn-standard SORT BY publication-date DESC",
+  "capped": true,
+  "executedAt": "2026-10-25T20:34:22.736Z"
+}

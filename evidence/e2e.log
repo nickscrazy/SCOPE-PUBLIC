@@ -1,0 +1,28 @@
+
+> scope-intelligence@0.1.0 test:e2e
+> playwright test
+
+[WebServer] (node:8032) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8045) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8056) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] .env not found. Continuing without it.
+[WebServer] (node:8086) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 8 tests using 1 worker
+
+(node:8093) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/product.spec.ts:32:1 › public routes, honest pricing, mobile menu, keyboard and reduced motion (3.0s)
+  ✓  2 tests/browser/product.spec.ts:92:1 › demo materially reranks and updates unknown certification evidence (1.1s)
+  ✓  3 tests/browser/product.spec.ts:124:1 › register, onboard, inspect sourced uncertainty, save, log out and return in a new session (3.3s)
+  ✓  4 tests/browser/product.spec.ts:201:1 › Free quota cannot be overridden in browser storage; starting a persisted trial unlocks it (1.1s)
+  ✓  5 tests/browser/product.spec.ts:240:1 › isolates two real browser accounts and renders malicious text without executing it (1.6s)
+  ✓  6 tests/browser/product.spec.ts:283:1 › marketing and application have no horizontal overflow at all required widths (5.6s)
+  ✓  7 tests/browser/product.spec.ts:307:1 › mobile profile can be completed and exported or deleted through settings (1.7s)
+  ✓  8 tests/browser/product.spec.ts:338:1 › WCAG A/AA automated audit of public and authenticated pages (5.5s)
+
+  8 passed (24.9s)

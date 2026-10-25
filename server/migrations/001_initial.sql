@@ -1,0 +1,12 @@
+CREATE TABLE users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,created_at TEXT NOT NULL,trial_started_at TEXT,trial_ends_at TEXT);
+CREATE TABLE sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires_at TEXT NOT NULL);
+CREATE TABLE profiles(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,data TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE opportunities(id TEXT PRIMARY KEY,source TEXT NOT NULL,source_id TEXT NOT NULL,data TEXT NOT NULL,content_hash TEXT NOT NULL,first_seen_at TEXT NOT NULL,last_seen_at TEXT NOT NULL,UNIQUE(source,source_id));
+CREATE TABLE opportunity_versions(id INTEGER PRIMARY KEY,opportunity_id TEXT NOT NULL REFERENCES opportunities(id),content_hash TEXT NOT NULL,data TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(opportunity_id,content_hash));
+CREATE TABLE saves(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,opportunity_id TEXT NOT NULL REFERENCES opportunities(id),created_at TEXT NOT NULL,PRIMARY KEY(user_id,opportunity_id));
+CREATE TABLE analyses(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,opportunity_id TEXT NOT NULL REFERENCES opportunities(id),month TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(user_id,opportunity_id,month));
+CREATE TABLE sync_runs(id TEXT PRIMARY KEY,source TEXT NOT NULL,started_at TEXT NOT NULL,finished_at TEXT,status TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,error TEXT);
+CREATE TABLE rate_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,reset_at INTEGER NOT NULL);
+CREATE INDEX sessions_expiry ON sessions(expires_at);
+CREATE INDEX saves_user ON saves(user_id);
+CREATE INDEX analyses_month ON analyses(user_id,month);

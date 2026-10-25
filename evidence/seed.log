@@ -1,0 +1,7 @@
+
+> scope-intelligence@0.1.0 db:seed
+> tsx --env-file-if-exists=.env server/seed.ts
+
+.env not found. Continuing without it.
+.env not found. Continuing without it.
+Seeded 3 official-link funding references. No fictional records or shared accounts. Check dates are preserved.

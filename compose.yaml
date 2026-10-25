@@ -1,0 +1,15 @@
+services:
+  scope:
+    build: .
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_PATH: /data/scope.db
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+    volumes:
+      - scope-data:/data
+    restart: unless-stopped
+volumes:
+  scope-data:

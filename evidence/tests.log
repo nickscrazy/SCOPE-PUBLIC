@@ -1,0 +1,15 @@
+
+> scope-intelligence@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /workspace/scope
+
+ ✓ tests/core.test.ts (20 tests) 1069ms
+ ✓ tests/ted.test.ts (8 tests) 24ms
+
+ Test Files  2 passed (2)
+      Tests  28 passed (28)
+   Start at  20:37:03
+   Duration  1.78s (transform 134ms, setup 0ms, collect 362ms, tests 1.09s, environment 0ms, prepare 94ms)
+

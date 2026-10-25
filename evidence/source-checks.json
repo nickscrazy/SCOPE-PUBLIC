@@ -1,0 +1,24 @@
+[
+  {
+    "url": "https://sem.gov.mt/open-calls/digitalise-your-sme",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "url": "https://fondi.eu/what-funding-is-available/sme-enhance/",
+    "status": 200,
+    "final_url": "https://fondi.eu/what-funding-is-available/sme-enhance/",
+    "checked_at": "2026-10-25T20:09:31.537341+00:00",
+    "excerpt": " FONDI.eu | SME Enhance - FONDI.eu {\"@context\":\"https://schema.org\",\"@graph\":[{\"@type\":\"WebPage\",\"@id\":\"https://fondi.eu/what-funding-is-available/sme-enhance/\",\"url\":\"https://fondi.eu/what-funding-is-available/sme-enhance/\",\"name\":\"SME Enhance - FONDI.eu\",\"isPartOf\":{\"@id\":\"https://www.fondi.eu/#website\"},\"primaryImageOfPage\":{\"@id\":\"https://fondi.eu/what-funding-is-available/sme-enhance/#primaryimage\"},\"image\":{\"@id\":\"https://fondi.eu/what-funding-is-available/sme-enhance/#primaryimage\"},\"thumbnailUrl\":\"https://fondi.eu/wp-content/uploads/2025/03/pexels-a-darmel-7641842-scaled-e1741015307858.jpg\",\"datePublished\":\"2025-02-07T15:21:00+00:00\",\"dateModified\":\"2026-10-19T07:22:24+00:00\",\"breadcrumb\":{\"@id\":\"https://fondi.eu/what-funding-is-available/sme-enhance/#breadcrumb\"},\"inLanguage\":\"en-US\",\"potentialAction\":[{\"@type\":\"ReadAction\",\"target\":[\"https://fondi.eu/what-funding-is-available/sme-enhance/\"]}]},{\"@type\":\"ImageObject\",\"inLanguage\":\"en-US\",\"@id\":\"https://fondi.eu/what-funding-is"
+  },
+  {
+    "url": "https://maltaenterprise.com/node/1917",
+    "error": "HTTP Error 403: Forbidden"
+  },
+  {
+    "url": "https://fondi.eu/what-funding-is-available/digitalise-your-sme/",
+    "status": 200,
+    "checked_at": "2026-10-25T20:11:17.348Z",
+    "facts_checked": "Official overview: non-repayable grants to part-finance SME digitalisation; Call 2 includes an AI component. Individual rules not evaluated.",
+    "snapshot": "source-digitalise.txt"
+  }
+]

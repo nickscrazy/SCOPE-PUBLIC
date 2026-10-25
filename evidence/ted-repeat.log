@@ -1,0 +1,13 @@
+
+> scope-intelligence@0.1.0 sync:ted
+> NODE_USE_ENV_PROXY=1 tsx --env-file-if-exists=.env server/sync.ts
+
+.env not found. Continuing without it.
+.env not found. Continuing without it.
+{
+  "status": "success",
+  "count": 90,
+  "totalAvailable": 347,
+  "query": "buyer-country = MLT AND publication-date >= 20260727 AND notice-type = cn-standard SORT BY publication-date DESC",
+  "capped": true
+}
