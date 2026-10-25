@@ -9,7 +9,7 @@ for (const suffix of ["", "-wal", "-shm"])
 const db = openDatabase(path);
 upsertOpportunities(db, grantsCatalogue);
 const response = JSON.parse(
-  readFileSync("evidence/ted-recent.json", "utf8"),
+  readFileSync("tests/fixtures/ted-recent.json", "utf8"),
 ) as { notices: Record<string, unknown>[] };
 upsertOpportunities(
   db,

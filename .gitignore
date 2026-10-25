@@ -4,7 +4,11 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+*.db.enc
+*.sha256
+data/
+backups/
 test-results/
 playwright-report/
-evidence/*.html
+evidence/**/*.html
 evidence/ted-openapi.json

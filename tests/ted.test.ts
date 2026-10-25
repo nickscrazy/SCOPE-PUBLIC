@@ -32,7 +32,7 @@ afterEach(() => db.close());
 describe("official TED API adapter", () => {
   it("parses the actual recorded API response with multilingual maps and numeric-string values", () => {
     const recorded = JSON.parse(
-      readFileSync("evidence/ted-recent.json", "utf8"),
+      readFileSync("tests/fixtures/ted-recent.json", "utf8"),
     );
     expect(recorded.notices.length).toBeGreaterThan(0);
     const o = normalizeNotice(recorded.notices[0], now);
@@ -90,7 +90,15 @@ describe("official TED API adapter", () => {
     expect(r.status).toBe("success");
     expect(r.count).toBe(2);
     expect(calls[0].url).toBe(TED_URL);
-    expect(calls.map((c) => c.body.page)).toEqual([1, 2]);
+    // Contract notices are paginated first; result notices for the same window follow.
+    const competition = calls.filter((c) =>
+      String(c.body.query).includes("notice-type IN"),
+    );
+    expect(competition.map((c) => c.body.page)).toEqual([1, 2]);
+    expect(
+      calls.filter((c) => String(c.body.query).includes("form-type = result"))
+        .length,
+    ).toBeGreaterThan(0);
     expect(calls[0].body).toMatchObject({
       paginationMode: "PAGE_NUMBER",
       scope: "ALL",
@@ -137,7 +145,8 @@ describe("official TED API adapter", () => {
       },
     });
     expect(r.status).toBe("success");
-    expect(attempts).toBe(3);
+    // Two failed attempts, the recovered contract-notice request, then the result-notice request.
+    expect(attempts).toBe(4);
     expect(waits).toEqual([250, 500]);
   });
   it("retains the complete prior catalogue if a later page fails and surfaces stale provenance", async () => {

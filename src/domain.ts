@@ -46,10 +46,16 @@ export type Condition = {
 export type Opportunity = {
   id: string;
   sourceId: string;
-  source: "TED" | "FONDI" | "SEM" | "Malta Enterprise" | "Fictional demo";
+  source:
+    | "TED"
+    | "FONDI"
+    | "SEM"
+    | "Malta Enterprise"
+    | "Servizz"
+    | "Fictional demo";
   title: string;
   buyer: string;
-  type: "tender" | "grant" | "tax_credit";
+  type: OpportunityType;
   description: string;
   sector: string;
   tags: string[];
@@ -66,15 +72,66 @@ export type Opportunity = {
   conditions: Condition[];
   role: string[];
   stale?: boolean;
+  /** TED procedure identity shared by a notice and its changes and results. */
+  procedureId?: string | null;
+  documentsUrl?: string | null;
+  lifecycle?: Lifecycle;
+  supersededBy?: string | null;
+  reviewDueAt?: string | null;
 };
+export const opportunityTypes = [
+  "tender",
+  "grant",
+  "tax_credit",
+  "loan",
+  "other_incentive",
+] as const;
+export type OpportunityType = (typeof opportunityTypes)[number];
+export const typeLabels: Record<OpportunityType, string> = {
+  tender: "Public tender",
+  grant: "Grant",
+  tax_credit: "Tax credit",
+  loan: "Loan or guarantee",
+  other_incentive: "Other incentive",
+};
+/**
+ * open: a deadline is known and in the future.
+ * deadline_passed: the known deadline has passed.
+ * result_published: TED has published a result notice for the same procedure.
+ * superseded: a later notice (e.g. a change notice) replaces this one.
+ * unknown: status cannot be established from the source.
+ */
+export type Lifecycle =
+  | "open"
+  | "deadline_passed"
+  | "result_published"
+  | "superseded"
+  | "unknown";
+export const closedLifecycles: Lifecycle[] = [
+  "deadline_passed",
+  "result_published",
+  "superseded",
+];
 export type ConditionResult = Condition & {
   status: "appears_met" | "unmet" | "unknown";
   evidence: string;
 };
+export type DimensionStatus = "positive" | "caution" | "blocker" | "unknown";
+export type Dimension = {
+  status: DimensionStatus;
+  summary: string;
+  notes: string[];
+};
 export type Match = {
+  /** Relevance only: how closely the subject matches the profile. Never eligibility. */
   score: number;
   reasons: string[];
   conditions: ConditionResult[];
+  dimensions: {
+    eligibility: Dimension & { met: number; unmet: number; unknown: number };
+    financial: Dimension;
+    capacity: Dimension;
+  };
 };
 export type Ranked = Opportunity & {
   match: Match;
@@ -87,16 +144,38 @@ export type OpportunitySummary = Omit<
 > & {
   match: Pick<Match, "score" | "reasons">;
 };
+export type Role = "user" | "editor" | "reviewer" | "admin";
 export type Account = {
   id: string;
   email: string;
-  plan: "free" | "trial";
+  emailVerified: boolean;
+  role: Role;
+  plan: "free" | "trial" | "solo";
   trialStartedAt: string | null;
   trialEndsAt: string | null;
   trialAvailable: boolean;
   analysesUsed: number;
   analysesLimit: number | null;
   savesLimit: number | null;
+  subscription: {
+    status: string;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
+  trialPending: boolean;
+};
+export type PublicConfig = {
+  billingEnabled: boolean;
+  soloPriceLabel: string;
+  emailDelivery: boolean;
+  legal: {
+    configured: boolean;
+    reviewed: boolean;
+    operatorName: string | null;
+    operatorAddress: string | null;
+    contactEmail: string | null;
+  };
+  incident: { title: string; message: string; severity: string } | null;
 };
 export const emptyProfile: Profile = {
   companyName: "",

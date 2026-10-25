@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { DB } from "./db.js";
-import { upsertOpportunities } from "./db.js";
+import { transaction, upsertOpportunities } from "./db.js";
 import type { Opportunity } from "../src/domain.js";
 export const TED_URL = "https://api.ted.europa.eu/v3/notices/search";
 export const TED_FIELDS = [
@@ -18,12 +18,26 @@ export const TED_FIELDS = [
   "deadline-receipt-tender-date-lot",
   "deadline-receipt-tender-time-lot",
   "notice-type",
+  "procedure-identifier",
+  "change-notice-version-identifier",
+];
+const RESULT_FIELDS = [
+  "publication-number",
+  "procedure-identifier",
+  "publication-date",
+  "notice-type",
 ];
 const responseSchema = z.object({
   notices: z.array(z.record(z.string(), z.unknown())).max(250),
   totalNoticeCount: z.number().nonnegative(),
   timedOut: z.boolean().optional(),
 });
+const publicationNumber = z.string().regex(/^\d{1,8}-\d{4}$/);
+const procedureId = z
+  .string()
+  .regex(/^[A-Za-z0-9-]{8,80}$/)
+  .optional()
+  .catch(undefined);
 function text(v: unknown): string {
   if (typeof v === "string") return v;
   if (Array.isArray(v)) return v.map(text).filter(Boolean).join("; ");
@@ -36,30 +50,38 @@ function text(v: unknown): string {
 function dateValue(v: unknown): string | null {
   const s = text(v);
   if (!s) return null;
-  const dateOnly = /^\d{4}-\d{2}-\d{2}(?:[+-]\d{2}:\d{2})?$/.test(s);
+  const dateOnly = /^\d{4}-\d{2}-\d{2}(?:[+-]\d{2}:\d{2}|Z)?$/.test(s);
   const d = new Date(dateOnly ? s.slice(0, 10) + "T00:00:00.000Z" : s);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 const sectorMap: Record<string, string> = {
   "03": "agriculture",
+  "09": "energy",
   "15": "food",
   "30": "office equipment",
+  "31": "electrical",
   "32": "technology",
   "33": "health",
   "34": "transport",
+  "35": "security",
+  "38": "laboratory",
   "39": "furnishings",
+  "44": "construction materials",
   "45": "construction",
   "48": "digital",
   "50": "maintenance",
   "55": "hospitality",
   "60": "transport",
+  "63": "logistics",
   "64": "communications",
+  "65": "utilities",
   "66": "financial services",
   "70": "real estate",
   "71": "engineering",
   "72": "digital",
   "73": "research",
   "75": "public services",
+  "77": "environment",
   "79": "business services",
   "80": "education",
   "85": "health",
@@ -71,11 +93,11 @@ export function normalizeNotice(
   n: Record<string, unknown>,
   now: Date,
 ): Opportunity {
-  const publication = z
-      .string()
-      .regex(/^\d+-\d{4}$/)
-      .parse(n["publication-number"]),
-    cpv = z.array(z.string()).parse(n["classification-cpv"] || []),
+  const publication = publicationNumber.parse(n["publication-number"]),
+    cpv = z
+      .array(z.string().regex(/^\d{8}$/))
+      .max(200)
+      .parse(n["classification-cpv"] || []),
     title = text(n["title-proc"]) || text(n["notice-title"]);
   if (!title) throw new Error("TED notice is missing title.");
   const sector = sectorMap[cpv[0]?.slice(0, 2)] || "public procurement";
@@ -95,6 +117,8 @@ export function normalizeNotice(
   const dates = n["deadline-receipt-tender-date-lot"],
     times = n["deadline-receipt-tender-time-lot"];
   let deadline: string | null = null;
+  // Lot deadlines need timezone and lot context. Only a single, explicitly zoned date+time
+  // becomes a notice-wide deadline; anything else remains unknown.
   if (
     Array.isArray(dates) &&
     dates.length === 1 &&
@@ -103,10 +127,14 @@ export function normalizeNotice(
   ) {
     const day = text(dates[0]).slice(0, 10),
       time = text(times[0]);
-    if (/^\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(time))
+    if (
+      /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+      /^\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(time)
+    )
       deadline = dateValue(day + "T" + time);
   }
-  // Lot deadlines need timezone and lot context. Do not guess a notice-wide cut-off from date-only arrays.
+  const procedure = procedureId.parse(n["procedure-identifier"]) ?? null;
+  const isChange = !!text(n["change-notice-version-identifier"]);
   return {
     id: "ted-" + publication,
     sourceId: publication,
@@ -119,7 +147,7 @@ export function normalizeNotice(
       "Published TED notice metadata. Full procurement documents have not been evaluated."
     ).slice(0, 16000),
     sector,
-    tags: [sector, ...cpv],
+    tags: [sector],
     cpv,
     geography: "Malta",
     value: amount,
@@ -128,7 +156,9 @@ export function normalizeNotice(
     fetchedAt: now.toISOString(),
     verifiedAt: now.toISOString(),
     sourceUrl: `https://ted.europa.eu/en/notice/-/detail/${publication}`,
-    sourceVersion: publication,
+    documentsUrl: `https://ted.europa.eu/en/notice/${publication}/pdf`,
+    sourceVersion: publication + (isChange ? " (change notice)" : ""),
+    procedureId: procedure,
     status: "published",
     role: [],
     conditions: [
@@ -148,6 +178,142 @@ export function normalizeNotice(
   };
 }
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
+type SyncOptions = {
+  fetcher?: FetchLike;
+  clock?: () => Date;
+  sleep?: (ms: number) => Promise<void>;
+  maxPages?: number;
+  limit?: number;
+  /** Full 90-day window instead of the incremental window from the last success. */
+  full?: boolean;
+  trigger?: string;
+};
+export type SyncResult = {
+  status: "success" | "failed";
+  count: number;
+  changed?: number;
+  results?: number;
+  superseded?: number;
+  closedByResult?: number;
+  totalAvailable?: number;
+  capped?: boolean;
+  since?: string;
+  query: string;
+  error?: string;
+  runId: string;
+};
+const MAX_WINDOW_DAYS = 90,
+  OVERLAP_DAYS = 3;
+const tedDate = (d: Date) => d.toISOString().slice(0, 10).replaceAll("-", "");
+export function syncWindow(db: DB, now: Date, full = false): Date {
+  const floor = new Date(now.getTime() - MAX_WINDOW_DAYS * 86400000);
+  if (full) return floor;
+  const last = db
+    .prepare(
+      "SELECT started_at FROM sync_runs WHERE source='TED' AND status='success' ORDER BY started_at DESC LIMIT 1",
+    )
+    .get() as { started_at: string } | undefined;
+  if (!last) return floor;
+  const since = new Date(
+    new Date(last.started_at).getTime() - OVERLAP_DAYS * 86400000,
+  );
+  return since > floor ? since : floor;
+}
+async function fetchPages(
+  query: string,
+  fields: string[],
+  o: Required<Pick<SyncOptions, "fetcher" | "sleep" | "maxPages" | "limit">>,
+) {
+  const notices: Record<string, unknown>[] = [];
+  let total = 0;
+  for (let page = 1; page <= o.maxPages; page++) {
+    let payload: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await o.fetcher(TED_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            query,
+            fields,
+            page,
+            limit: o.limit,
+            scope: "ALL",
+            paginationMode: "PAGE_NUMBER",
+          }),
+          redirect: "error",
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!response.ok) {
+          const e = new Error(`TED HTTP ${response.status}`);
+          // Permission and request errors are not retried; 403s are never worked around.
+          if (response.status !== 429 && response.status < 500)
+            throw Object.assign(e, { retryable: false });
+          throw e;
+        }
+        const length = Number(response.headers.get("content-length") || 0);
+        if (length > 20 * 1024 * 1024) throw new Error("TED response too large");
+        payload = await response.json();
+        break;
+      } catch (e) {
+        if (attempt === 2 || (e as { retryable?: boolean }).retryable === false)
+          throw e;
+        await o.sleep(250 * 2 ** attempt);
+      }
+    }
+    const parsed = responseSchema.parse(payload);
+    if (parsed.timedOut) throw new Error("TED response timed out.");
+    total = parsed.totalNoticeCount;
+    notices.push(...parsed.notices);
+    if (parsed.notices.length < o.limit || page * o.limit >= total) break;
+    await o.sleep(200);
+  }
+  return { notices, total };
+}
+/** Recompute stored lifecycle for TED records from procedure identity. */
+export function recomputeTedLifecycle(db: DB) {
+  return transaction(db, () => {
+    const rows = db
+      .prepare(
+        "SELECT id,procedure_id,data FROM opportunities WHERE source='TED' AND procedure_id IS NOT NULL",
+      )
+      .all() as { id: string; procedure_id: string; data: string }[];
+    const byProcedure = new Map<string, { id: string; key: string }[]>();
+    for (const r of rows) {
+      const o = JSON.parse(r.data) as Opportunity;
+      const [num, year] = o.sourceId.split("-").map(Number);
+      // Newest publication wins; publication number orders notices within a year.
+      const key = `${o.publishedAt ?? ""}|${String(year).padStart(4, "0")}|${String(num).padStart(8, "0")}`;
+      const list = byProcedure.get(r.procedure_id) || [];
+      list.push({ id: r.id, key });
+      byProcedure.set(r.procedure_id, list);
+    }
+    db.exec(
+      "UPDATE opportunities SET lifecycle='unknown',superseded_by=NULL WHERE source='TED'",
+    );
+    let superseded = 0;
+    const mark = db.prepare(
+      "UPDATE opportunities SET lifecycle='superseded',superseded_by=? WHERE id=?",
+    );
+    for (const list of byProcedure.values()) {
+      if (list.length < 2) continue;
+      list.sort((a, b) => (a.key < b.key ? 1 : -1));
+      for (const older of list.slice(1)) {
+        mark.run(list[0].id, older.id);
+        superseded++;
+      }
+    }
+    const closed = db
+      .prepare(
+        "UPDATE opportunities SET lifecycle='result_published' WHERE source='TED' AND procedure_id IN (SELECT procedure_id FROM ted_results)",
+      )
+      .run().changes;
+    return { superseded, closedByResult: Number(closed) };
+  });
+}
 export async function syncTed(
   db: DB,
   {
@@ -156,83 +322,63 @@ export async function syncTed(
     sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
     maxPages = 3,
     limit = 30,
-  }: {
-    fetcher?: FetchLike;
-    clock?: () => Date;
-    sleep?: (ms: number) => Promise<void>;
-    maxPages?: number;
-    limit?: number;
-  } = {},
-) {
+    full = false,
+    trigger = "manual",
+  }: SyncOptions = {},
+): Promise<SyncResult> {
   const id = randomUUID(),
     now = clock(),
-    since = new Date(now.getTime() - 90 * 86400000)
-      .toISOString()
-      .slice(0, 10)
-      .replaceAll("-", "");
-  const query = `buyer-country = MLT AND publication-date >= ${since} AND notice-type = cn-standard SORT BY publication-date DESC`;
+    since = syncWindow(db, now, full);
+  const window = `buyer-country = MLT AND publication-date >= ${tedDate(since)}`;
+  const query = `${window} AND notice-type IN (cn-standard cn-social) SORT BY publication-date DESC`;
+  const resultQuery = `${window} AND form-type = result SORT BY publication-date DESC`;
   db.prepare(
-    "INSERT INTO sync_runs(id,source,started_at,status) VALUES(?,?,?,?)",
-  ).run(id, "TED", now.toISOString(), "running");
+    "INSERT INTO sync_runs(id,source,started_at,status,trigger) VALUES(?,?,?,?,?)",
+  ).run(id, "TED", now.toISOString(), "running", trigger);
   try {
-    const records: Opportunity[] = [];
-    let total = 0;
-    for (let page = 1; page <= maxPages; page++) {
-      let payload: unknown;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const response = await fetcher(TED_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              query,
-              fields: TED_FIELDS,
-              page,
-              limit,
-              scope: "ALL",
-              paginationMode: "PAGE_NUMBER",
-            }),
-            signal: AbortSignal.timeout(20000),
-          });
-          if (!response.ok) {
-            const e = new Error(`TED HTTP ${response.status}`);
-            if (response.status !== 429 && response.status < 500)
-              throw Object.assign(e, { retryable: false });
-            throw e;
-          }
-          payload = await response.json();
-          break;
-        } catch (e) {
-          if (
-            attempt === 2 ||
-            (e as { retryable?: boolean }).retryable === false
-          )
-            throw e;
-          await sleep(250 * 2 ** attempt);
-        }
-      }
-      const parsed = responseSchema.parse(payload);
-      if (parsed.timedOut) throw new Error("TED response timed out.");
-      total = parsed.totalNoticeCount;
-      records.push(...parsed.notices.map((n) => normalizeNotice(n, now)));
-      if (parsed.notices.length < limit || page * limit >= total) break;
-      await sleep(200);
-    }
+    const opts = { fetcher, sleep, maxPages, limit };
+    const competition = await fetchPages(query, TED_FIELDS, opts);
+    const records = competition.notices.map((n) => normalizeNotice(n, now));
+    const results = await fetchPages(resultQuery, RESULT_FIELDS, opts);
+    const resultRows = results.notices.flatMap((n) => {
+      const pub = publicationNumber.safeParse(n["publication-number"]);
+      const proc = procedureId.parse(n["procedure-identifier"]);
+      return pub.success && proc
+        ? [{ pub: pub.data, proc, date: dateValue(n["publication-date"]) }]
+        : [];
+    });
     const unique = [...new Map(records.map((o) => [o.sourceId, o])).values()];
-    upsertOpportunities(db, unique, now);
-    db.prepare(
-      "UPDATE sync_runs SET finished_at=?,status=?,count=? WHERE id=?",
-    ).run(clock().toISOString(), "success", unique.length, id);
-    return {
-      status: "success",
-      count: unique.length,
-      totalAvailable: total,
-      query,
-      capped: total > maxPages * limit,
+    // Validate everything first, then commit atomically: a failure leaves prior data intact.
+    const outcome = transaction(db, () => {
+      const changed = upsertOpportunities(db, unique, now);
+      const insertResult = db.prepare(
+        "INSERT INTO ted_results(procedure_id,publication_number,published_at,seen_at) VALUES(?,?,?,?) ON CONFLICT(procedure_id) DO UPDATE SET seen_at=excluded.seen_at",
+      );
+      for (const r of resultRows)
+        insertResult.run(r.proc, r.pub, r.date, now.toISOString());
+      return { changed, ...recomputeTedLifecycle(db) };
+    });
+    const capped =
+      competition.total > maxPages * limit || results.total > maxPages * limit;
+    const detail = {
+      since: since.toISOString(),
+      changed: outcome.changed,
+      results: resultRows.length,
+      superseded: outcome.superseded,
+      closedByResult: outcome.closedByResult,
+      totalAvailable: competition.total,
+      capped,
     };
+    db.prepare(
+      "UPDATE sync_runs SET finished_at=?,status=?,count=?,detail=? WHERE id=?",
+    ).run(
+      clock().toISOString(),
+      "success",
+      unique.length,
+      JSON.stringify(detail),
+      id,
+    );
+    return { status: "success", count: unique.length, query, runId: id, ...detail };
   } catch (e) {
     const reason = e instanceof Error ? e.message : "Unknown source failure";
     const safe = reason.startsWith("TED ")
@@ -241,6 +387,6 @@ export async function syncTed(
     db.prepare(
       "UPDATE sync_runs SET finished_at=?,status=?,error=? WHERE id=?",
     ).run(clock().toISOString(), "failed", safe, id);
-    return { status: "failed", count: 0, error: safe, query };
+    return { status: "failed", count: 0, error: safe, query, runId: id };
   }
 }

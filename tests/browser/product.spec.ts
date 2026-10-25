@@ -24,7 +24,7 @@ async function noOverflow(page: Page) {
 async function screenshot(page: Page, name: string, fullPage = true) {
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
-    path: `evidence/screenshots/${name}.png`,
+    path: `evidence/release/screenshots/${name}.png`,
     fullPage,
     animations: "disabled",
   });
@@ -357,7 +357,7 @@ test("WCAG A/AA automated audit of public and authenticated pages", async ({
     report[route] = r.violations;
   }
   writeFileSync(
-    "evidence/accessibility-results.json",
+    "evidence/release/accessibility-results.json",
     JSON.stringify(report, null, 2),
   );
   for (const [route, violations] of Object.entries(report))

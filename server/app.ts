@@ -3,62 +3,139 @@ import helmet from "helmet";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { DB } from "./db.js";
-import { allOpportunities, transaction } from "./db.js";
-import {
-  account,
-  createSession,
-  getUser,
-  hashPassword,
-  verifyPassword,
-  tokenHash,
-} from "./auth.js";
-import { profileSchema, emptyProfile } from "../src/domain.js";
-import { matchOpportunity, freshness } from "./matching.js";
-export function createApp(
-  db: DB,
-  options: {
-    clock?: () => Date;
-    baseUrl?: string;
-    secureCookies?: boolean;
-  } = {},
-) {
-  const app = express(),
-    clock = options.clock || (() => new Date()),
-    baseUrl = options.baseUrl || "http://localhost:3000";
-  const allowedOrigin = new URL(baseUrl).origin;
+import { pendingMigrations } from "./db.js";
+import { getSession } from "./auth.js";
+import { loadConfig, testConfig, type Config } from "./config.js";
+import { createMailer, type Mailer } from "./email.js";
+import { createBilling, applyBillingEvent, verifyStripeSignature, BillingError } from "./billing.js";
+import { makeLimiter, HttpError, type Ctx } from "./context.js";
+import { publicAuthRoutes, accountRoutes } from "./routes-account.js";
+import { opportunityRoutes, billingRoutes } from "./routes-opportunities.js";
+import { adminRoutes } from "./routes-admin.js";
+import { recordInboundMessage, verifyInboundSignature, MAX_MESSAGE_BYTES } from "./inbound.js";
+import type { FetchLike } from "./ted.js";
+import { log, errorName } from "./log.js";
+import type { PublicConfig } from "../src/domain.js";
+
+export type AppOptions = {
+  config?: Config;
+  clock?: () => Date;
+  mailer?: Mailer;
+  /** Fetch used for billing provider calls (tests point it at a local mock). */
+  billingFetcher?: FetchLike;
+  tedFetcher?: FetchLike;
+  /** Legacy options kept for compatibility with earlier tests. */
+  baseUrl?: string;
+  secureCookies?: boolean;
+};
+
+export function createApp(db: DB, options: AppOptions = {}) {
+  const config =
+    options.config ??
+    (options.baseUrl || options.secureCookies !== undefined
+      ? testConfig({ BASE_URL: options.secureCookies ? "https://localhost:3000" : options.baseUrl || "http://localhost:3000" })
+      : process.env.APP_ENV || process.env.NODE_ENV === "production"
+        ? loadConfig()
+        : testConfig());
+  const clock = options.clock || (() => new Date());
+  const mailer = options.mailer ?? createMailer(config);
+  const billing = createBilling(config, options.billingFetcher);
+  const { allow, limited } = makeLimiter(db, clock);
+  const ctx: Ctx = { db, config, clock, mailer, billing, allow, limited, tedFetcher: options.tedFetcher ?? fetch };
+  const allowedOrigin = new URL(config.BASE_URL).origin;
+  const app = express();
   app.disable("x-powered-by");
+  if (config.TRUST_PROXY) {
+    const v = config.TRUST_PROXY;
+    app.set("trust proxy", /^\d+$/.test(v) ? Number(v) : v === "true" ? true : v);
+  }
+  app.use((req, res, next) => {
+    const started = process.hrtime.bigint();
+    const id = randomUUID();
+    res.set("X-Request-Id", id);
+    res.on("finish", () => {
+      if (!req.path.startsWith("/api")) return;
+      log.info("http.request", {
+        id,
+        method: req.method,
+        route: (req.route?.path as string | undefined) ?? req.path.replace(/[0-9a-f-]{20,}/gi, ":id").slice(0, 80),
+        status: res.statusCode,
+        ms: Number((process.hrtime.bigint() - started) / 1000000n),
+      });
+    });
+    next();
+  });
+  const strictCsp = config.APP_ENV !== "development";
   app.use(
     helmet({
-      contentSecurityPolicy:
-        process.env.NODE_ENV === "production"
-          ? {
-              directives: {
-                "default-src": ["'self'"],
-                "script-src": ["'self'"],
-                "style-src": ["'self'", "'unsafe-inline'"],
-                "img-src": ["'self'", "data:"],
-                "font-src": ["'self'"],
-                "connect-src": ["'self'"],
-                "form-action": ["'self'"],
-                "frame-ancestors": ["'none'"],
-                "upgrade-insecure-requests": null,
-              },
-            }
-          : false,
-      strictTransportSecurity:
-        process.env.NODE_ENV === "production" ? undefined : false,
+      contentSecurityPolicy: strictCsp
+        ? {
+            directives: {
+              "default-src": ["'self'"],
+              "script-src": ["'self'"],
+              "style-src": ["'self'", "'unsafe-inline'"],
+              "img-src": ["'self'", "data:"],
+              "font-src": ["'self'"],
+              "connect-src": ["'self'"],
+              "form-action": ["'self'"],
+              "frame-ancestors": ["'none'"],
+              "base-uri": ["'self'"],
+              "object-src": ["'none'"],
+              "upgrade-insecure-requests": config.secureCookies ? [] : null,
+            },
+          }
+        : false,
+      strictTransportSecurity: config.secureCookies ? { maxAge: 31536000, includeSubDomains: true } : false,
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      crossOriginEmbedderPolicy: false,
     }),
   );
-  app.use(express.json({ limit: "40kb" }));
+  app.use((_req, res, next) => {
+    res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+    next();
+  });
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     next();
   });
+
+  // Signed machine-to-machine endpoints: raw bodies, no cookies, no browser origin checks.
+  app.post("/api/billing/webhook", express.raw({ type: "*/*", limit: "512kb" }), (req, res) => {
+    if (!config.billingEnabled) throw new HttpError(404, "Endpoint not found.");
+    const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!verifyStripeSignature(raw, req.header("stripe-signature"), config.STRIPE_WEBHOOK_SECRET!, Math.floor(clock().getTime() / 1000))) {
+      log.warn("billing.webhook_rejected", {});
+      throw new HttpError(400, "Invalid signature.");
+    }
+    const event = z
+      .object({ id: z.string().max(255), type: z.string().max(120), created: z.number().int(), data: z.object({ object: z.record(z.string(), z.unknown()) }) })
+      .parse(JSON.parse(raw.toString("utf8")));
+    const outcome = applyBillingEvent(db, event, clock());
+    log.info("billing.webhook", { type: event.type, outcome });
+    res.json({ received: true, outcome });
+  });
+  app.post("/api/inbound/email", express.raw({ type: "*/*", limit: MAX_MESSAGE_BYTES }), async (req, res) => {
+    if (!config.INBOUND_EMAIL_SECRET) throw new HttpError(404, "Endpoint not found.");
+    const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!verifyInboundSignature(raw, req.header("x-scope-timestamp"), req.header("x-scope-signature"), config.INBOUND_EMAIL_SECRET, Math.floor(clock().getTime() / 1000)))
+      throw new HttpError(401, "Invalid signature.");
+    if (!allow("inbound-webhook", 500, 3600000)) throw new HttpError(429, "Too many messages.");
+    try {
+      const r = await recordInboundMessage(db, raw, "webhook", null, clock());
+      res.status(r.duplicate ? 200 : 202).json({ id: r.id, duplicate: r.duplicate });
+    } catch {
+      throw new HttpError(400, "Unreadable message.");
+    }
+  });
+
+  app.use("/api/admin/inbound", express.json({ limit: "3mb" }));
+  app.use(express.json({ limit: "40kb" }));
+  // CSRF defence for cookie-authenticated APIs: same-origin fetch metadata, matching Origin,
+  // and JSON-only bodies (which HTML forms cannot send cross-site).
   app.use("/api", (req, res, next) => {
-    if (req.headers["sec-fetch-site"] === "cross-site") {
-      res
-        .status(403)
-        .json({ error: "Cross-site API access is not permitted." });
+    const site = req.headers["sec-fetch-site"];
+    if (site && site !== "same-origin" && site !== "none") {
+      res.status(403).json({ error: "Cross-site API access is not permitted." });
       return;
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
@@ -73,393 +150,100 @@ export function createApp(
     }
     next();
   });
-  function rate(
-    req: express.Request,
-    key: string,
-    limit: number,
-    windowMs: number,
-  ) {
-    const now = clock().getTime(),
-      k = tokenHash(`${key}:${req.ip}`);
-    return transaction(db, () => {
-      const r = db.prepare("SELECT * FROM rate_limits WHERE key=?").get(k);
-      if (!r || Number(r.reset_at) <= now) {
-        db.prepare("INSERT OR REPLACE INTO rate_limits VALUES(?,?,?)").run(
-          k,
-          1,
-          now + windowMs,
-        );
-        return true;
-      }
-      if (Number(r.count) >= limit) return false;
-      db.prepare("UPDATE rate_limits SET count=count+1 WHERE key=?").run(k);
-      return true;
-    });
-  }
-  const limited =
-    (key: string, limit: number, ms: number): express.RequestHandler =>
-    (req, res, next) => {
-      if (!rate(req, key, limit, ms)) {
-        res
-          .set("Retry-After", String(Math.ceil(ms / 1000)))
-          .status(429)
-          .json({ error: "Too many requests. Please try again later." });
-        return;
-      }
-      next();
-    };
+
+  // Public, unauthenticated endpoints
   app.get("/api/health", (_req, res) => {
     db.prepare("SELECT 1").get();
     res.json({ status: "ok" });
   });
-  const credentials = z.object({
-    email: z
-      .email()
-      .max(254)
-      .transform((s) => s.toLowerCase()),
-    password: z.string().min(12).max(128),
-    startTrial: z.boolean().optional(),
+  const { router: oppRouter, tedHealth } = opportunityRoutes(ctx);
+  app.get("/api/ready", (_req, res) => {
+    const checks: Record<string, unknown> = {};
+    let ready = true;
+    try {
+      db.prepare("SELECT 1").get();
+      checks.database = "ok";
+      const pending = pendingMigrations(db, config.MIGRATIONS_DIR);
+      checks.migrations = pending.length ? { pending } : "ok";
+      if (pending.length) ready = false;
+      const ted = tedHealth(clock());
+      checks.tedSource = { lastSuccessAt: ted.lastSuccessAt, stale: ted.stale };
+    } catch (e) {
+      ready = false;
+      checks.database = errorName(e);
+    }
+    checks.email = mailer.provider;
+    checks.billing = config.billingEnabled ? "stripe" : "disabled";
+    res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "not_ready", checks });
   });
-  app.post(
-    "/api/auth/register",
-    limited("auth", 15, 15 * 60000),
-    async (req, res) => {
-      const c = credentials.parse(req.body),
-        id = randomUUID(),
-        now = clock(),
-        trial = c.startTrial !== false;
-      const hash = await hashPassword(c.password);
-      try {
-        db.prepare("INSERT INTO users VALUES(?,?,?,?,?,?)").run(
-          id,
-          c.email,
-          hash,
-          now.toISOString(),
-          trial ? now.toISOString() : null,
-          trial ? new Date(now.getTime() + 7 * 86400000).toISOString() : null,
-        );
-      } catch (e) {
-        if (String(e).includes("UNIQUE")) {
-          res.status(409).json({
-            error: "An account already uses this email. Please log in.",
-          });
-          return;
-        }
-        throw e;
-      }
-      createSession(
-        db,
-        res,
-        id,
-        now,
-        options.secureCookies ?? process.env.NODE_ENV === "production",
-      );
-      res.status(201).json({ ok: true });
-    },
-  );
-  app.post(
-    "/api/auth/login",
-    limited("auth", 15, 15 * 60000),
-    async (req, res) => {
-      const c = credentials.parse(req.body),
-        u = db.prepare("SELECT * FROM users WHERE email=?").get(c.email) as
-          import("./auth.js").User | undefined;
-      // Equal-cost derivation for unknown addresses to reduce account enumeration by timing.
-      const valid = await verifyPassword(
-        c.password,
-        u?.password_hash ||
-          "00000000000000000000000000000000:" + "00".repeat(64),
-      );
-      if (!u || !valid) {
-        res.status(401).json({ error: "Email or password is incorrect." });
-        return;
-      }
-      createSession(
-        db,
-        res,
-        u.id,
-        clock(),
-        options.secureCookies ?? process.env.NODE_ENV === "production",
-      );
-      res.json({ ok: true });
-    },
-  );
-  app.post("/api/auth/logout", (req, res) => {
-    const token = req.headers.cookie?.match(
-      /(?:^|; )scope_session=([a-f0-9]+)/,
-    )?.[1];
-    if (token)
-      db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
-        tokenHash(token),
-      );
-    res.clearCookie("scope_session", {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      secure: options.secureCookies ?? process.env.NODE_ENV === "production",
-    });
-    res.json({ ok: true });
+  app.get("/api/config", (_req, res) => {
+    const incident = db
+      .prepare("SELECT title,customer_message,severity FROM incidents WHERE status='open' AND customer_visible=1 ORDER BY updated_at DESC LIMIT 1")
+      .get() as { title: string; customer_message: string | null; severity: string } | undefined;
+    const body: PublicConfig = {
+      billingEnabled: config.billingEnabled,
+      soloPriceLabel: config.SOLO_PRICE_LABEL,
+      emailDelivery: mailer.delivers,
+      legal: {
+        configured: config.legalConfigured,
+        reviewed: config.LEGAL_REVIEWED,
+        operatorName: config.LEGAL_OPERATOR_NAME ?? null,
+        operatorAddress: config.LEGAL_OPERATOR_ADDRESS ?? null,
+        contactEmail: config.LEGAL_CONTACT_EMAIL ?? null,
+      },
+      incident: incident ? { title: incident.title, message: incident.customer_message ?? "", severity: incident.severity } : null,
+    };
+    res.set("Cache-Control", "public, max-age=60").json(body);
   });
+  const auth = publicAuthRoutes(ctx);
+  app.use("/api", auth.router);
+
+  // Everything below requires a valid session.
   app.use("/api", (req, res, next) => {
-    const u = getUser(db, req, clock());
-    if (!u) {
+    const s = getSession(db, req, clock());
+    if (!s) {
       res.status(401).json({ error: "Please log in to continue." });
       return;
     }
-    res.locals.user = u;
+    res.locals.user = s.user;
+    res.locals.sessionId = s.sessionId;
     next();
   });
-  app.get("/api/me", (_req, res) => {
-    res.json(account(db, res.locals.user, clock()));
-  });
-  app.post("/api/trial", limited("trial", 10, 3600000), (_req, res) => {
-    const now = clock();
-    const result = db
-      .prepare(
-        "UPDATE users SET trial_started_at=?,trial_ends_at=? WHERE id=? AND trial_started_at IS NULL",
-      )
-      .run(
-        now.toISOString(),
-        new Date(now.getTime() + 7 * 86400000).toISOString(),
-        res.locals.user.id,
-      );
-    if (!result.changes) {
-      res
-        .status(409)
-        .json({ error: "Your seven-day trial has already been used." });
-      return;
-    }
-    res.json({ ok: true });
-  });
-  app.get("/api/profile", (_req, res) => {
-    const r = db
-      .prepare("SELECT data FROM profiles WHERE user_id=?")
-      .get(res.locals.user.id);
-    res.json({ profile: r ? JSON.parse(String(r.data)) : null });
-  });
-  app.put("/api/profile", limited("profile", 60, 3600000), (req, res) => {
-    const p = profileSchema.parse(req.body);
-    db.prepare(
-      "INSERT INTO profiles VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at",
-    ).run(res.locals.user.id, JSON.stringify(p), clock().toISOString());
-    res.json({ profile: p });
-  });
-  app.delete("/api/profile", (_req, res) => {
-    db.prepare("DELETE FROM profiles WHERE user_id=?").run(res.locals.user.id);
-    res.json({ ok: true });
-  });
-  app.get("/api/profile/export", (_req, res) => {
-    const r = db
-      .prepare("SELECT data,updated_at FROM profiles WHERE user_id=?")
-      .get(res.locals.user.id);
-    res.set("Content-Disposition", 'attachment; filename="scope-profile.json"');
-    res.json({
-      profile: r ? JSON.parse(String(r.data)) : null,
-      updatedAt: r?.updated_at || null,
-    });
-  });
-  function ranked(userId: string) {
-    const r = db
-        .prepare("SELECT data FROM profiles WHERE user_id=?")
-        .get(userId),
-      p = r ? JSON.parse(String(r.data)) : emptyProfile;
-    const saves = new Set(
-      db
-        .prepare("SELECT opportunity_id FROM saves WHERE user_id=?")
-        .all(userId)
-        .map((s) => s.opportunity_id),
-    );
-    const sync = db
-      .prepare(
-        "SELECT status FROM sync_runs WHERE source='TED' ORDER BY started_at DESC LIMIT 1",
-      )
-      .get();
-    return allOpportunities(db)
-      .filter((o) => o.status !== "fictional")
-      .map((o) => ({
-        ...o,
-        stale: o.source === "TED" && sync?.status === "failed",
-        match: matchOpportunity(p, o, clock()),
-        saved: saves.has(o.id),
-        freshness: freshness(
-          { ...o, stale: o.source === "TED" && sync?.status === "failed" },
-          clock(),
-        ),
-      }))
-      .sort((a, b) => b.match.score - a.match.score);
-  }
-  app.get("/api/opportunities", (req, res) => {
-    const filter = z
-      .object({
-        q: z.string().max(120).optional(),
-        type: z.enum(["all", "tender", "grant", "tax_credit"]).optional(),
-        sector: z.string().max(80).optional(),
-        saved: z.enum(["true", "false"]).optional(),
-        deadline: z.enum(["all", "upcoming", "unknown"]).optional(),
-        source: z.string().max(80).optional(),
-        location: z.string().max(80).optional(),
-        maxValue: z.coerce.number().min(0).optional(),
-        minScore: z.coerce.number().min(0).max(100).optional(),
-      })
-      .parse(req.query);
-    const records = ranked(res.locals.user.id).filter(
-      (o) =>
-        (!filter.q ||
-          `${o.title} ${o.description} ${o.buyer}`
-            .toLowerCase()
-            .includes(filter.q.toLowerCase())) &&
-        (!filter.type || filter.type === "all" || o.type === filter.type) &&
-        (!filter.sector || o.sector === filter.sector) &&
-        (filter.saved !== "true" || o.saved) &&
-        (!filter.source || o.source === filter.source) &&
-        (!filter.location || o.geography === filter.location) &&
-        (!filter.maxValue || o.value === null || o.value <= filter.maxValue) &&
-        (!filter.minScore || o.match.score >= filter.minScore) &&
-        (filter.deadline !== "upcoming" ||
-          (!!o.deadline && new Date(o.deadline) > clock())) &&
-        (filter.deadline !== "unknown" || !o.deadline),
-    );
-    // Detailed condition evaluations are metered; feed exposes only the relevance summary.
-    res.json({
-      opportunities: records.map((o) => {
-        const { conditions, role, ...summary } = o;
-        void conditions;
-        void role;
-        return {
-          ...summary,
-          match: { score: o.match.score, reasons: o.match.reasons.slice(0, 1) },
-        };
-      }),
-      sources: db
-        .prepare(
-          "SELECT source,started_at,finished_at,status,count,error FROM sync_runs ORDER BY started_at DESC LIMIT 5",
-        )
-        .all(),
-      hasProfile: !!db
-        .prepare("SELECT 1 FROM profiles WHERE user_id=?")
-        .get(res.locals.user.id),
-    });
-  });
-  app.get(
-    "/api/opportunities/:id",
-    limited("analysis", 120, 3600000),
-    (req, res) => {
-      const o = ranked(res.locals.user.id).find((o) => o.id === req.params.id);
-      if (!o) {
-        res.status(404).json({ error: "Opportunity not found." });
-        return;
-      }
-      const now = clock(),
-        u = res.locals.user,
-        id = u.id,
-        month = now.toISOString().slice(0, 7);
-      const allowed = transaction(db, () => {
-        const plan = account(db, u, now);
-        const seen = db
-          .prepare(
-            "SELECT 1 FROM analyses WHERE user_id=? AND opportunity_id=? AND month=?",
-          )
-          .get(id, o.id, month);
-        if (plan.plan === "free" && !seen && plan.analysesUsed >= 3)
-          return false;
-        if (plan.plan === "free" && !seen)
-          db.prepare("INSERT INTO analyses VALUES(?,?,?,?)").run(
-            id,
-            o.id,
-            month,
-            now.toISOString(),
-          );
-        return true;
-      });
-      if (!allowed) {
-        res.status(402).json({
-          error:
-            "You have used your 3 detailed analyses for this calendar month. Browsing and existing analyses remain available.",
-          code: "ANALYSIS_LIMIT",
-        });
-        return;
-      }
-      res.json({ opportunity: o });
-    },
-  );
-  app.post("/api/saves/:id", limited("saves", 120, 3600000), (req, res) => {
-    const id = z.string().max(120).parse(req.params.id);
-    if (!db.prepare("SELECT 1 FROM opportunities WHERE id=?").get(id)) {
-      res.status(404).json({ error: "Opportunity not found." });
-      return;
-    }
-    const allowed = transaction(db, () => {
-      const uid = res.locals.user.id,
-        plan = account(db, res.locals.user, clock());
-      if (
-        db
-          .prepare("SELECT 1 FROM saves WHERE user_id=? AND opportunity_id=?")
-          .get(uid, id)
-      )
-        return true;
-      const count = Number(
-        db.prepare("SELECT COUNT(*) AS n FROM saves WHERE user_id=?").get(uid)
-          ?.n,
-      );
-      if (plan.savesLimit !== null && count >= plan.savesLimit) return false;
-      db.prepare("INSERT INTO saves VALUES(?,?,?)").run(
-        uid,
-        id,
-        clock().toISOString(),
-      );
-      return true;
-    });
-    if (!allowed) {
-      res.status(402).json({
-        error:
-          "Free includes up to 5 saved opportunities. Remove a save to add another.",
-      });
-      return;
-    }
-    res.json({ ok: true });
-  });
-  app.delete("/api/saves/:id", (req, res) => {
-    db.prepare("DELETE FROM saves WHERE user_id=? AND opportunity_id=?").run(
-      res.locals.user.id,
-      String(req.params.id),
-    );
-    res.json({ ok: true });
-  });
+  app.use("/api", accountRoutes(ctx, auth.sendVerification));
+  app.use("/api", oppRouter);
+  app.use("/api", billingRoutes(ctx));
+  app.use("/api", adminRoutes(ctx));
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Endpoint not found." });
   });
-  app.use(
-    (
-      err: unknown,
-      _req: express.Request,
-      res: express.Response,
-      _next: express.NextFunction,
-    ) => {
-      void _next;
-      if (err instanceof z.ZodError) {
-        res.status(400).json({
-          error: err.issues
-            .map((i) => `${i.path.join(".")}: ${i.message}`)
-            .join("; "),
-        });
-        return;
-      }
-      if (err instanceof SyntaxError) {
-        res.status(400).json({ error: "Invalid JSON request." });
-        return;
-      }
-      if ((err as { type?: string }).type === "entity.too.large") {
-        res.status(413).json({ error: "Request is too large." });
-        return;
-      }
-      console.error(
-        "Request failed:",
-        err instanceof Error ? err.name : "Unknown error",
-      );
-      res.status(500).json({
-        error: "The request could not be completed. Please try again.",
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    void _next;
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+      return;
+    }
+    if (err instanceof BillingError) {
+      log.error("billing.error", { status: err.status });
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    if (err instanceof z.ZodError) {
+      res.status(400).json({
+        error: err.issues.map((i) => (i.path.length ? `${i.path.join(".")}: ` : "") + i.message).join("; "),
       });
-    },
-  );
+      return;
+    }
+    if (err instanceof SyntaxError) {
+      res.status(400).json({ error: "Invalid JSON request." });
+      return;
+    }
+    const type = (err as { type?: string }).type;
+    if (type === "entity.too.large") {
+      res.status(413).json({ error: "Request is too large." });
+      return;
+    }
+    log.error("http.unhandled", { error: errorName(err) });
+    res.status(500).json({ error: "The request could not be completed. Please try again." });
+  });
   return app;
 }

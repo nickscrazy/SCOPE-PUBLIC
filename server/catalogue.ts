@@ -145,46 +145,48 @@ const conditionSchema = z
       });
     }
   });
-export const curatedImportSchema = z
-  .array(
-    z.object({
-      id: z.string().regex(/^[a-z0-9-]{1,100}$/),
-      sourceId: z.string().min(1).max(120),
-      source: z.enum(["FONDI", "SEM", "Malta Enterprise"]),
-      title: z.string().min(2).max(500),
-      buyer: z.string().max(250),
-      type: z.enum(["grant", "tax_credit"]),
-      description: z.string().max(10000),
-      sector: z.string().max(100),
-      tags: z.array(z.string().max(100)).max(30),
-      cpv: z.array(z.string()).max(30),
-      geography: z.literal("Malta"),
-      value: z.number().min(0).nullable(),
-      deadline: z.iso.datetime().nullable(),
-      publishedAt: z.iso.datetime().nullable(),
-      fetchedAt: z.iso.datetime(),
-      verifiedAt: z.iso.datetime().nullable(),
-      sourceUrl: z.url().refine((s) => {
-        const u = new URL(s);
-        return (
-          u.protocol === "https:" &&
-          [
-            "fondi.eu",
-            "www.fondi.eu",
-            "sem.gov.mt",
-            "maltaenterprise.com",
-            "www.maltaenterprise.com",
-            "www.servizz.gov.mt",
-          ].includes(u.hostname) &&
-          !u.username &&
-          !u.password
-        );
-      }, "Use an approved official HTTPS source."),
-      sourceVersion: z.string().min(1).max(120),
-      status: z.literal("reference"),
-      conditions: z.array(conditionSchema).min(1).max(30),
-      role: z.array(z.enum(["bidder", "subcontractor", "consortium"])).max(3),
-    }),
-  )
-  .min(1)
-  .max(100);
+/** Official hosts an editor may cite for curated funding references. */
+export const OFFICIAL_HOSTS = [
+  "fondi.eu",
+  "www.fondi.eu",
+  "sem.gov.mt",
+  "www.sem.gov.mt",
+  "maltaenterprise.com",
+  "www.maltaenterprise.com",
+  "servizz.gov.mt",
+  "www.servizz.gov.mt",
+];
+export const officialUrl = z.url().max(500).refine((s) => {
+  const u = new URL(s);
+  return (
+    u.protocol === "https:" &&
+    OFFICIAL_HOSTS.includes(u.hostname) &&
+    !u.port &&
+    !u.username &&
+    !u.password
+  );
+}, "Use an approved official HTTPS source.");
+export const curatedRecordSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]{1,100}$/),
+  sourceId: z.string().min(1).max(120),
+  source: z.enum(["FONDI", "SEM", "Malta Enterprise", "Servizz"]),
+  title: z.string().trim().min(2).max(500),
+  buyer: z.string().trim().max(250),
+  type: z.enum(["grant", "tax_credit", "loan", "other_incentive"]),
+  description: z.string().trim().max(10000),
+  sector: z.string().trim().max(100),
+  tags: z.array(z.string().trim().max(100)).max(30),
+  cpv: z.array(z.string().regex(/^\d{8}$/)).max(30),
+  geography: z.literal("Malta"),
+  value: z.number().min(0).max(1e10).nullable(),
+  deadline: z.iso.datetime().nullable(),
+  publishedAt: z.iso.datetime().nullable(),
+  fetchedAt: z.iso.datetime(),
+  verifiedAt: z.iso.datetime().nullable(),
+  sourceUrl: officialUrl,
+  sourceVersion: z.string().min(1).max(120),
+  status: z.literal("reference"),
+  conditions: z.array(conditionSchema).min(1).max(30),
+  role: z.array(z.enum(["bidder", "subcontractor", "consortium"])).max(3),
+});
+export const curatedImportSchema = z.array(curatedRecordSchema).min(1).max(100);

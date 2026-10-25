@@ -14,21 +14,26 @@ import { researchProfile, restaurantProfile } from "../src/domain";
 import { demoOpportunities } from "../src/demo-data";
 import { matchOpportunity, freshness } from "../server/matching";
 import { grantsCatalogue, curatedImportSchema } from "../server/catalogue";
+import { captureMailer, registerAccount } from "./helpers";
 const password = "A long password for testing 42!";
-let db: DB, now: Date, app: ReturnType<typeof createApp>;
+let db: DB,
+  now: Date,
+  app: ReturnType<typeof createApp>,
+  mailer: ReturnType<typeof captureMailer>;
 beforeEach(() => {
   db = openDatabase(":memory:");
   now = new Date("2026-10-25T12:00:00Z");
-  app = createApp(db, { clock: () => now });
+  mailer = captureMailer();
+  app = createApp(db, { clock: () => now, mailer });
   upsertOpportunities(db, grantsCatalogue);
 });
 afterEach(() => {
   db.close();
 });
-function register(email: string, startTrial = true) {
-  return request(app)
-    .post("/api/auth/register")
-    .send({ email, password, startTrial });
+// Registers and confirms the email through the delivered link (the trial starts on confirmation).
+async function register(email: string, startTrial = true) {
+  return (await registerAccount(app, mailer, email, password, { startTrial }))
+    .response;
 }
 function cookie(r: { headers: Record<string, unknown> }): string {
   return (r.headers["set-cookie"] as string[])[0].split(";")[0];

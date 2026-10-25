@@ -6,7 +6,7 @@ export default defineConfig({
   expect: { timeout: 8000 },
   reporter: [
     ["list"],
-    ["json", { outputFile: "evidence/browser-results.json" }],
+    ["json", { outputFile: "evidence/release/browser-results.json" }],
   ],
   use: {
     baseURL: "http://localhost:3100",
