@@ -42,7 +42,12 @@ switch (command) {
   }
   case "seed": {
     const db = openDatabase(config.DATABASE_PATH);
-    const changed = upsertOpportunities(db, grantsCatalogue);
+    let changed = 0;
+    // Each reference is due for re-verification on the editorial interval from its last check.
+    for (const ref of grantsCatalogue)
+      changed += upsertOpportunities(db, [ref], new Date(), {
+        reviewDueAt: ref.verifiedAt ? new Date(new Date(ref.verifiedAt).getTime() + config.EDITORIAL_REVIEW_DAYS * 86400000).toISOString() : null,
+      });
     db.close();
     out({ references: grantsCatalogue.length, changed, note: "Reviewed references only; no fictional records or accounts. Check dates are preserved." });
     break;

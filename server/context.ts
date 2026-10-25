@@ -23,8 +23,9 @@ export type Locals = { user: User; sessionId: string };
 export function userOf(res: express.Response): User {
   return (res.locals as Locals).user;
 }
-export function makeLimiter(db: DB, clock: () => Date) {
-  const allow = (key: string, limit: number, windowMs: number) => {
+export function makeLimiter(db: DB, clock: () => Date, multiplier = 1) {
+  const allow = (key: string, baseLimit: number, windowMs: number) => {
+    const limit = baseLimit * multiplier;
     const now = clock().getTime(),
       k = tokenHash(key);
     return transaction(db, () => {

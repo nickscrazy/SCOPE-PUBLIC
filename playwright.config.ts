@@ -11,7 +11,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3100",
     launchOptions: {
-      executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+      executablePath: process.env.CHROMIUM_PATH || undefined,
       args: ["--no-sandbox"],
     },
     trace: "retain-on-failure",
@@ -22,9 +22,15 @@ export default defineConfig({
     url: "http://localhost:3100/api/health",
     reuseExistingServer: false,
     env: {
+      APP_ENV: "staging",
       DATABASE_PATH: "./data/e2e.db",
       PORT: "3100",
       BASE_URL: "http://localhost:3100",
+      EMAIL_PROVIDER: "outbox",
+      OUTBOX_DIR: "./data/e2e-outbox",
+      BACKUP_DIR: "./data/e2e-backups",
+      LOG_LEVEL: "warn",
+      RATE_LIMIT_MULTIPLIER: "10",
     },
     timeout: 30000,
   },

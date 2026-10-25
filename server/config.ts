@@ -22,6 +22,8 @@ const schema = z.object({
   MIGRATIONS_DIR: z.string().default("server/migrations"),
   TRUST_PROXY: z.string().default(""),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /** Test harnesses that create many accounts from one IP may raise limits; refused in production. */
+  RATE_LIMIT_MULTIPLIER: z.coerce.number().int().min(1).max(100).default(1),
 
   EMAIL_PROVIDER: z.enum(["outbox", "smtp", "disabled"]).default("outbox"),
   EMAIL_FROM: z.string().default("SCOPE <no-reply@localhost>"),
@@ -98,6 +100,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   )
     problems.push("BACKUP_ENCRYPTION_KEY must be 64 hex characters (32 bytes)");
   if (c.APP_ENV === "production") {
+    if (c.RATE_LIMIT_MULTIPLIER !== 1)
+      problems.push("RATE_LIMIT_MULTIPLIER cannot be changed in production");
     if (!https) problems.push("BASE_URL must use https in production");
     if (c.EMAIL_PROVIDER !== "smtp")
       problems.push(

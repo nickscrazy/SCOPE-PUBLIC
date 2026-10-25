@@ -40,7 +40,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
   const clock = options.clock || (() => new Date());
   const mailer = options.mailer ?? createMailer(config);
   const billing = createBilling(config, options.billingFetcher);
-  const { allow, limited } = makeLimiter(db, clock);
+  const { allow, limited } = makeLimiter(db, clock, config.RATE_LIMIT_MULTIPLIER);
   const ctx: Ctx = { db, config, clock, mailer, billing, allow, limited, tedFetcher: options.tedFetcher ?? fetch };
   const allowedOrigin = new URL(config.BASE_URL).origin;
   const app = express();
@@ -194,6 +194,19 @@ export function createApp(db: DB, options: AppOptions = {}) {
       incident: incident ? { title: incident.title, message: incident.customer_message ?? "", severity: incident.severity } : null,
     };
     res.set("Cache-Control", "public, max-age=60").json(body);
+  });
+  // Crawlers: public marketing pages only; the workspace and token pages are excluded.
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+      `User-agent: *\nDisallow: /app\nDisallow: /api\nDisallow: /reset-password\nDisallow: /verify-email\nSitemap: ${config.BASE_URL.replace(/\/$/, "")}/sitemap.xml\n`,
+    );
+  });
+  app.get("/sitemap.xml", (_req, res) => {
+    const base = config.BASE_URL.replace(/\/$/, "");
+    const pages = ["/", "/how-it-works", "/pricing", "/demo", "/sources", "/privacy", "/terms", "/cookies"];
+    res
+      .type("application/xml")
+      .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages.map((p) => `<url><loc>${base}${p}</loc></url>`).join("")}</urlset>\n`);
   });
   const auth = publicAuthRoutes(ctx);
   app.use("/api", auth.router);

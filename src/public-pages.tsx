@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -25,9 +25,10 @@ import {
   CTA,
 } from "./components";
 import { demoOpportunities } from "./demo-data";
-import { researchProfile, restaurantProfile } from "./domain";
+import { researchProfile, restaurantProfile, typeLabels } from "./domain";
 import { matchOpportunity } from "../server/matching";
-import { date } from "./api";
+import { date, usePublicConfig } from "./api";
+import { Success } from "./components";
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -200,7 +201,7 @@ function ProductPreview() {
 const faqs = [
   [
     "Are you affiliated with the government?",
-    "No. SCOPE is an independent product prototype. We link to official sources and do not represent any authority or funding body.",
+    "No. SCOPE is independent. We link to official sources and do not represent any government department, contracting authority or funding body.",
   ],
   [
     "Does a high relevance score mean I qualify?",
@@ -208,20 +209,26 @@ const faqs = [
   ],
   [
     "Which opportunities can I find?",
-    "Published TED notices relating to Malta, when imported, and a small curated catalogue of Maltese funding references. We do not provide complete ePPS coverage. Fictional examples appear only in the public demo.",
+    "Contract notices from Maltese buyers published on the EU’s TED platform, refreshed twice daily, and a reviewed catalogue of Maltese funding programmes and tax credits. Many lower-value Maltese tenders appear only on ePPS, which SCOPE does not cover. The sources page lists exactly what is included.",
   ],
   [
     "What happens after seven days?",
-    "Your trial ends automatically and your account moves to Free: three detailed analyses per UTC calendar month and up to five saved opportunities. No card, charge or cancellation required.",
+    "Your trial ends automatically and your account moves to Free: three detailed analyses per calendar month and up to five saved opportunities. No card, no charge and nothing to cancel. The trial starts when you confirm your email address.",
   ],
 ];
 export function Home() {
   const [faq, setFaq] = useState<number | null>(0);
+  const [params] = useSearchParams();
   return (
     <PublicLayout>
+      {params.get("account") === "deleted" && (
+        <div className="container">
+          <Success message="Your account and its data have been deleted. Thank you for trying SCOPE." />
+        </div>
+      )}
       <section className="hero container">
         <div className="hero-copy">
-          <Eyebrow>BUSINESS OPPORTUNITY INTELLIGENCE</Eyebrow>
+          <Eyebrow>PUBLIC TENDERS & FUNDING FOR MALTESE SMEs</Eyebrow>
           <h1>
             The right
             <br />
@@ -230,9 +237,11 @@ export function Home() {
             <span>Within reach.</span>
           </h1>
           <p>
-            Public tenders and funding, brought into focus.
-            <br className="desktop-break" /> Matched to the business you’ve
-            built.
+            SCOPE finds public tenders and government funding for Malta-based
+            businesses and ranks them against what you actually do.{" "}
+            <br className="desktop-break" />
+            Every match shows its official source — and what still needs
+            checking.
           </p>
           <div className="hero-actions">
             <Link className="button forest" to="/signup">
@@ -246,7 +255,7 @@ export function Home() {
             <span className="assurance-dot" />
             Seven days free <i />
             No card required <i />
-            Malta + EU
+            Independent of government
           </div>
         </div>
         <HeroSculpture />
@@ -261,20 +270,20 @@ export function Home() {
       <section className="attributes">
         <div className="container">
           <span>
-            <ScanLine size={19} />
-            Matched to your capabilities
+            <ScanLine size={19} aria-hidden />
+            Ranked by what you do
           </span>
           <span>
-            <FileCheck2 size={19} />
-            Linked to original evidence
+            <FileCheck2 size={19} aria-hidden />
+            Linked to the official source
           </span>
           <span>
-            <Globe2 size={19} />
-            Tenders + business funding
+            <Globe2 size={19} aria-hidden />
+            TED tenders + Maltese funding
           </span>
           <span>
-            <ShieldCheck size={19} />
-            Clear about the unknowns
+            <ShieldCheck size={19} aria-hidden />
+            Relevance is never eligibility
           </span>
         </div>
       </section>
@@ -447,13 +456,13 @@ export function HowItWorks() {
             SlidersHorizontal,
             "02 / RELEVANCE",
             "Ranked for a reason.",
-            "A deterministic model weighs service overlap (35), sector (20), geography (15), value (10), credentials (10), role (5) and experience (5). Change your profile and the ranking changes.",
+            "A transparent model weighs service overlap (up to 30), the official procurement classification (CPV, 20), sector (15), geography (10), value range (10), credentials (10), role (5) and experience (5). Closed or replaced notices are down-ranked. Change your profile and the ranking changes.",
           ],
           [
             FileCheck2,
             "03 / THE EVIDENCE",
             "Confidence, with context.",
-            "Relevance and mandatory conditions are separate. Each condition carries a source locator and a status: appears met, unmet or unknown. Missing information never becomes a positive answer.",
+            "Relevance, eligibility, financial fit and delivery capacity are assessed separately. Each condition carries a source locator and a status: appears met, unmet or unknown. Missing information never becomes a positive answer.",
           ],
         ].map(([Icon, n, t, p]) => {
           const I = Icon as typeof Building2;
@@ -480,10 +489,21 @@ export function HowItWorks() {
   );
 }
 export function Pricing() {
+  const config = usePublicConfig();
+  const billing = !!config?.billingEnabled;
+  const solo = config?.soloPriceLabel ?? "€19";
+  const rows: [string, string, string][] = [
+    ["Browse all active opportunities", "Yes", "Yes"],
+    ["Detailed analyses (conditions, financial fit, capacity)", "3 per month", "Unlimited*"],
+    ["Saved opportunities", "Up to 5", "Unlimited*"],
+    ["Side-by-side comparison of saved records", "Yes", "Yes"],
+    ["Business profiles", "One", "One"],
+    ["Data export and deletion", "Yes", "Yes"],
+  ];
   return (
     <PublicLayout>
       <section className="page-hero centered container">
-        <Eyebrow>ROOM FOR YOUR AMBITION</Eyebrow>
+        <Eyebrow>PLANS & PRICING</Eyebrow>
         <h1>
           A clearer view.
           <br />
@@ -492,109 +512,103 @@ export function Pricing() {
         <p>
           Start with seven days of full access. No payment details.
           <br />
-          Continue on Free when your trial ends.
+          Continue on Free when your trial ends{billing ? ", or move to Solo." : "."}
         </p>
-        <span className="launch-note">
-          Launch pricing under evaluation · Paid subscriptions unavailable
-        </span>
+        {!billing && <span className="launch-note">Paid subscriptions are not yet available. Nothing can be charged.</span>}
       </section>
-      <section className="pricing-grid container">
-        {[
-          {
-            name: "Free",
-            price: "0",
-            desc: "A place to start looking.",
-            features: [
-              "Browse all available opportunities",
-              "3 detailed analyses / calendar month",
-              "Up to 5 saved opportunities",
-              "One business profile",
-            ],
-            to: "/signup?plan=free",
-            cta: "Start with Free",
-          },
-          {
-            name: "Solo",
-            price: "19",
-            desc: "For your independent ambition.",
-            features: [
-              "Unlimited detailed analyses*",
-              "Unlimited saved opportunities*",
-              "Transparent qualification checks",
-              "One business profile",
-            ],
-            to: "/signup",
-            cta: "Try Solo features for 7 days",
-          },
-          {
-            name: "Team",
-            price: "59",
-            desc: "A direction we’re exploring.",
-            features: [
-              "Proposed shared workspace",
-              "Proposed team member access",
-              "Proposed shared shortlists",
-              "Not included in this prototype",
-            ],
-            to: null,
-            cta: "Paid access unavailable",
-          },
-        ].map((p, i) => (
-          <article
-            className={"pricing-card " + (i === 1 ? "featured" : "")}
-            key={p.name}
-          >
-            {i === 1 && (
-              <span className="plan-badge">EXPLORE ON YOUR FREE TRIAL</span>
-            )}
-            <span className="micro">{p.name}</span>
-            <div className="price">
-              €{p.price}
-              <span>/ month</span>
-            </div>
-            <p>{p.desc}</p>
-            <ul>
-              {p.features.map((f) => (
-                <li key={f}>
-                  <Check size={16} />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            {p.to ? (
-              <Link
-                className={"button " + (i === 1 ? "signal" : "outline")}
-                to={p.to}
-              >
-                {p.cta}
-                <ArrowUpRight size={17} />
-              </Link>
-            ) : (
-              <button className="button outline" disabled>
-                {p.cta}
-              </button>
-            )}
-            <span className="pricing-foot">
-              {i === 0
-                ? "Free, with no time limit."
-                : i === 1
-                  ? "Experimental price. No checkout available."
-                  : "Future concept. No team access available."}
-            </span>
-          </article>
-        ))}
+      <section className="pricing-grid two container">
+        <article className="pricing-card">
+          <span className="micro">Free</span>
+          <div className="price">
+            €0<span>/ month</span>
+          </div>
+          <p>A place to start looking.</p>
+          <ul>
+            <li>
+              <Check size={16} aria-hidden />
+              Browse every active opportunity
+            </li>
+            <li>
+              <Check size={16} aria-hidden />3 detailed analyses each calendar month
+            </li>
+            <li>
+              <Check size={16} aria-hidden />
+              Up to 5 saved opportunities
+            </li>
+            <li>
+              <Check size={16} aria-hidden />
+              Includes a one-time 7-day full trial
+            </li>
+          </ul>
+          <Link className="button outline" to="/signup">
+            Start free trial <ArrowUpRight size={17} aria-hidden />
+          </Link>
+          <span className="pricing-foot">Free, with no time limit. No card.</span>
+        </article>
+        <article className="pricing-card featured">
+          <span className="plan-badge">{billing ? "FOR REGULAR BIDDERS" : "COMING SOON"}</span>
+          <span className="micro">Solo</span>
+          <div className="price">
+            {solo}
+            <span>/ month</span>
+          </div>
+          <p>For businesses that bid or apply regularly.</p>
+          <ul>
+            <li>
+              <Check size={16} aria-hidden />
+              Unlimited detailed analyses*
+            </li>
+            <li>
+              <Check size={16} aria-hidden />
+              Unlimited saved opportunities*
+            </li>
+            <li>
+              <Check size={16} aria-hidden />
+              Everything in Free
+            </li>
+            <li>
+              <Check size={16} aria-hidden />
+              Cancel any time from the billing portal
+            </li>
+          </ul>
+          {billing ? (
+            <Link className="button signal" to="/signup">
+              Start with the trial <ArrowUpRight size={17} aria-hidden />
+            </Link>
+          ) : (
+            <Link className="button signal" to="/signup">
+              Try every Solo feature free for 7 days <ArrowUpRight size={17} aria-hidden />
+            </Link>
+          )}
+          <span className="pricing-foot">
+            {billing ? "Upgrade from Account & plan. VAT may apply; final price at checkout." : "Not yet purchasable. The trial includes every Solo feature."}
+          </span>
+        </article>
+      </section>
+      <section className="container plan-table-wrap">
+        <table className="plan-table">
+          <caption className="sr-only">Plan comparison</caption>
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <th scope="col">Free</th>
+              <th scope="col">Solo / trial</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([f, a, b]) => (
+              <tr key={f}>
+                <th scope="row">{f}</th>
+                <td>{a}</td>
+                <td>{b}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
       <section className="pricing-explanation container">
-        <p>
-          * Trial access is subject to reasonable request limits. After seven
-          days, Free limits apply automatically. Existing saves remain
-          accessible if you exceed the Free save allowance, but you cannot add
-          more until below five.
-        </p>
-        <p>
-          No charges, automated emails or recurring payments are enabled. Prices
-          are product hypotheses, not an offer to purchase.
-        </p>
+        <p>* Within fair-use request limits. After the seven-day trial, Free limits apply automatically. Saves above the Free allowance stay accessible; you can add more once below five.</p>
+        <p>Shared team workspaces are not offered. SCOPE does not submit tenders or applications and does not guarantee eligibility or awards.</p>
       </section>
       <CTA />
     </PublicLayout>
@@ -691,7 +705,7 @@ export function Demo() {
                 key={r.id}
               >
                 <div className="row space-between">
-                  <Tag>{r.type}</Tag>
+                  <Tag>{typeLabels[r.type]}</Tag>
                   <Fit score={r.match.score} />
                 </div>
                 <h3>{r.title}</h3>
@@ -734,183 +748,202 @@ export function Sources() {
           <br />
           <span>Honest boundaries.</span>
         </h1>
-        <p>
-          We organise public information to support your judgement. We do not
-          replace the official documents.
-        </p>
+        <p>We organise public information to support your judgement. We do not replace the official documents.</p>
       </section>
       <section className="container prose sources-prose">
-        <h2>Published procurement notices</h2>
+        <h2>Public tenders from TED</h2>
         <p>
-          SCOPE’s server-side adapter uses the official{" "}
-          <a
-            href="https://docs.ted.europa.eu/api/latest/search.html"
-            target="_blank"
-            rel="noreferrer"
-          >
-            EU TED published-notices Search API
-          </a>
-          . Operator imports are scoped to Malta-related published notices.
-          Publication does not mean an opportunity is still open: notices may be
-          historic, amended or awarded. Each record retains its publication
-          identity, retrieval time and original source link. Unknown deadlines
-          remain unknown.
+          SCOPE uses the official{" "}
+          <a href="https://docs.ted.europa.eu/api/latest/search.html" target="_blank" rel="noopener noreferrer">
+            EU TED Search API
+          </a>{" "}
+          to import contract notices from Maltese buyers, refreshed twice a day over a rolling 90-day window. TED publishes notices above EU thresholds and some below; it does not contain every Maltese public tender.
         </p>
-        <h2>A curated Maltese funding catalogue</h2>
         <p>
-          Funding entries are references to official schemes, not verified
-          offers of aid. A source check confirms only the facts stated in the
-          catalogue. Programme opening status, application cut-offs, eligible
-          costs, aid ceilings and your company’s eligibility require a current
-          review.
+          Notices that belong to the same procedure are linked. When a buyer publishes a change notice, the earlier notice is marked as replaced. When a result (award) notice appears, the procedure is marked as closed. Notices whose deadline has passed are hidden from Discover by default. Deadlines are only shown when the notice states a single, time-zoned closing time; multi-lot deadlines stay “not confirmed”.
+        </p>
+        <h2>Maltese funding programmes and tax credits</h2>
+        <p>
+          Funding entries are references to official schemes, written by an editor from the official page and published only after a second reviewer has checked the source. Each shows when it was verified and when it is due for re-verification; overdue entries are flagged. Grants, tax credits, loans and other incentives are labelled separately. Opening status, eligible costs, aid ceilings and your eligibility always require confirmation.
         </p>
         <div className="source-table">
           <div>
             <strong>SME Enhance</strong>
-            <a
-              href="https://fondi.eu/what-funding-is-available/sme-enhance/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              FONDI ↗
+            <a href="https://fondi.eu/what-funding-is-available/sme-enhance/" target="_blank" rel="noopener noreferrer">
+              FONDI
             </a>
-            <span>
-              Reference page checked {date("2026-10-25")} · individual
-              eligibility unassessed
-            </span>
+            <span>Grant reference · first checked {date("2026-10-25")}</span>
           </div>
           <div>
             <strong>Digitalise your SME</strong>
-            <a
-              href="https://fondi.eu/what-funding-is-available/digitalise-your-sme/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              FONDI ↗
+            <a href="https://fondi.eu/what-funding-is-available/digitalise-your-sme/" target="_blank" rel="noopener noreferrer">
+              FONDI
             </a>
-            <span>Official reference · see per-record check and freshness</span>
+            <span>Grant reference · first checked {date("2026-10-25")}</span>
           </div>
           <div>
             <strong>Micro Invest 2026–2030</strong>
-            <a
-              href="https://maltaenterprise.com/node/1917"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Malta Enterprise ↗
+            <a href="https://maltaenterprise.com/node/1917" target="_blank" rel="noopener noreferrer">
+              Malta Enterprise
             </a>
-            <span>
-              Tax credit · access returned 403 during build; current terms
-              unverified. Brief indicates submissions from 2027.
-            </span>
+            <span>Tax credit · official page refused automated access (HTTP 403); shown as unverified until an editor confirms it</span>
           </div>
         </div>
+        <h2>Tender alert emails</h2>
+        <p>
+          The operations team can forward tender alert emails they are entitled to receive. SCOPE reads them as untrusted text: links are recognised but never opened, attachments are discarded, and TED notices are then requested from the official TED API. Links to ePPS are kept for manual follow-up only.
+        </p>
         <h2>No automated ePPS access</h2>
         <p>
-          SCOPE does not scrape Malta’s ePPS, circumvent access restrictions or
-          claim complete Maltese tender coverage. No ePPS attachments are
-          fetched. An authorised feed would require separate agreement and
-          implementation.
+          SCOPE does not scrape Malta’s ePPS, circumvent access restrictions or claim complete Maltese tender coverage. The ePPS terms of use prohibit automated retrieval. An authorised feed would require a separate agreement.
         </p>
-        <h2>Freshness, failure and uncertainty</h2>
+        <h2>Freshness and failure</h2>
         <p>
-          Every detail includes its source URL, last retrieval and source-check
-          timestamp. Checks older than seven days carry a stale warning. Failed
-          TED imports preserve the previous catalogue and surface a cached-data
-          warning. The public demo is entirely fictional and does not enter the
-          account catalogue.
+          Every record shows its source link, retrieval date and verification date. If the TED refresh fails or is more than 36 hours old, records are marked as possibly out of date; earlier data is never deleted because of a failed refresh.
         </p>
         <h2>Independent by design</h2>
         <p>
-          No government affiliation, partnerships or eligibility guarantees are
-          implied. Free public assistance is also available from{" "}
-          <a href="https://sem.gov.mt/" target="_blank" rel="noreferrer">
+          No government affiliation, partnership or eligibility guarantee is implied. Free public assistance is available from{" "}
+          <a href="https://sem.gov.mt/" target="_blank" rel="noopener noreferrer">
             SEM
-          </a>
-          . Original official terms always take precedence.
+          </a>{" "}
+          and the administering authorities. Official terms always take precedence.
         </p>
       </section>
     </PublicLayout>
   );
 }
+function OperatorNotice() {
+  const config = usePublicConfig();
+  if (!config) return null;
+  const l = config.legal;
+  return l.configured ? (
+    <div className="operator-box">
+      <h2>Who operates SCOPE</h2>
+      <p>
+        {l.operatorName}
+        <br />
+        {l.operatorAddress}
+        <br />
+        Contact: <a href={"mailto:" + l.contactEmail}>{l.contactEmail}</a>
+      </p>
+      {!l.reviewed && <p className="small-text">This notice has not yet been reviewed by a lawyer.</p>}
+    </div>
+  ) : (
+    <div className="operator-box warning">
+      <h2>Operator details not yet published</h2>
+      <p>
+        The legal entity operating this installation has not been configured. Until it is, this service is an evaluation deployment and should not be used for real business data.
+      </p>
+    </div>
+  );
+}
 export function Legal({ kind }: { kind: "privacy" | "terms" }) {
+  const config = usePublicConfig();
+  const contact = config?.legal.contactEmail;
   return (
     <PublicLayout>
       <section className="page-hero container">
-        <Eyebrow>PRODUCT PROTOTYPE / {kind.toUpperCase()}</Eyebrow>
+        <Eyebrow>{kind === "privacy" ? "PRIVACY NOTICE" : "TERMS OF USE"}</Eyebrow>
         <h1>
           {kind === "privacy" ? "Your business." : "Clear expectations."}
           <br />
-          <span>
-            {kind === "privacy" ? "Your information." : "From the beginning."}
-          </span>
+          <span>{kind === "privacy" ? "Your information." : "From the beginning."}</span>
         </h1>
       </section>
       <section className="container prose">
+        <OperatorNotice />
         {kind === "privacy" ? (
           <>
-            <h2>What this prototype stores</h2>
+            <h2>What we hold</h2>
+            <ul>
+              <li>Account: email address, a salted scrypt password hash, confirmation status, plan and trial dates.</li>
+              <li>Business profile you enter: services, sectors, experience, past projects, credentials and dates, staff and capacity figures, a turnover band (never accounts or bank details), preferences.</li>
+              <li>Activity: saved opportunities, monthly analysis counts, signed-in devices (browser family and operating system only, plus last-active time).</li>
+              <li>Billing (only if you subscribe): a customer and subscription reference from the payment provider and the subscription status. Card details are handled by the payment provider, not by SCOPE.</li>
+              <li>Security records: an audit log of account events (for example sign-in or password change) keyed to a pseudonymous account identifier, without email addresses or IP addresses.</li>
+            </ul>
+            <h2>Why</h2>
             <p>
-              Your email, a salted scrypt password hash, a server-side session,
-              declared business profile, saved opportunities, trial dates and
-              monthly analysis usage. Financial information is limited to bands.
-              Please do not enter bank details, tax credentials or confidential
-              client documents.
+              To provide the service you ask for (account, matching, saved records, billing), to keep it secure and to meet legal obligations. Matching is a deterministic calculation in your account; no profile data is sent to AI model providers or advertisers. There are no advertising or analytics trackers.
             </p>
-            <h2>Purpose and control</h2>
+            <h2>How long</h2>
+            <ul>
+              <li>Account and profile: until you delete them. Unconfirmed accounts are deleted after 30 days.</li>
+              <li>Expired sessions and used links: removed within a day of expiry. Monthly usage counts: about 13 months.</li>
+              <li>Audit log: 12 months by default. After account deletion its entries are kept only under a pseudonym.</li>
+              <li>Encrypted backups: rolling 30 days by default; deleted data disappears from backups when they expire.</li>
+            </ul>
+            <h2>Your controls</h2>
             <p>
-              Profile information is used for deterministic matching in your
-              account. There are no advertising trackers or model providers. The
-              app uses one necessary, HttpOnly session cookie for up to 30 days.
-              You can export and delete your business profile in account
-              settings. Saved items and account records remain; account deletion
-              currently requires a database operator.
+              In Account & plan you can export all data held about your account, delete your business profile, or delete your account entirely. An active paid subscription is cancelled when you delete your account.
+              {contact ? (
+                <>
+                  {" "}
+                  For any other request, including access, correction, objection or complaints, contact <a href={"mailto:" + contact}>{contact}</a>.
+                </>
+              ) : null}{" "}
+              You may also complain to your data protection authority (in Malta, the Information and Data Protection Commissioner).
             </p>
-            <h2>Before a public launch</h2>
-            <p>
-              This is a local evaluation prototype, not a publicly offered
-              service. Controller identity, contact details, retention schedule,
-              jurisdictional rights process, processor agreements and backup
-              deletion processes must be completed before accepting public
-              customer data. No full GDPR compliance claim is made.
-            </p>
+            <h2>Processors</h2>
+            <p>The operator’s hosting provider, email delivery provider and, if you subscribe, payment provider process data on its behalf. The operator publishes the current list on request.</p>
           </>
         ) : (
           <>
-            <h2>An evaluation product</h2>
+            <h2>The service</h2>
             <p>
-              SCOPE is a working product prototype for review. Pricing is
-              experimental. No paid subscription or payment checkout is
-              available. Do not rely on it as your sole source for legal,
-              financial or procurement decisions.
+              SCOPE helps you find and assess public tenders and funding programmes. It organises public information; it does not submit tenders or applications, and it does not communicate with authorities for you.
             </p>
             <h2>Information and eligibility</h2>
             <p>
-              Matches indicate relevance, not eligibility or entitlement to aid.
-              Information can be incomplete or stale. Check original notice
-              documents and scheme terms, and obtain professional advice where
-              appropriate. We do not submit applications, tenders or communicate
-              with authorities on your behalf.
+              Relevance scores indicate subject fit, not eligibility or entitlement to aid. Information can be incomplete, amended or out of date. Always check the original notice, documents and scheme terms, and take professional advice where appropriate. Your profile facts are self-declared and are not verified by SCOPE.
             </p>
-            <h2>Trial and Free</h2>
+            <h2>Plans</h2>
             <p>
-              A trial lasts exactly seven days from server-recorded activation
-              and can start once per account. It ends automatically with no
-              payment. Free includes three distinct detailed analyses per UTC
-              calendar month and five saved opportunities. Reopening an already
-              analysed record that month does not consume another credit. Trial
-              usage does not consume Free credits. Creating multiple accounts to
-              evade limits is outside the intended evaluation use.
+              The trial lasts seven days from email confirmation and can be used once per account. Free includes three distinct detailed analyses per calendar month (UTC) and five saved opportunities. Re-opening a record already analysed that month is free. Paid plans, where offered, are billed through the payment provider and can be cancelled at any time with effect at the end of the paid period.
             </p>
             <h2>Acceptable use</h2>
             <p>
-              Use only authorised business information. Do not attempt
-              unauthorised access or bulk extraction. Rate limits protect
-              accounts and analyses. Full commercial terms, service levels and a
-              legal entity remain prerequisites for launch.
+              Use only business information you are entitled to share. Do not attempt unauthorised access, automated bulk extraction or circumvention of plan limits, including by creating multiple accounts. Fair-use request limits apply.
             </p>
+            <h2>Not yet included</h2>
+            <p>Liability limits, governing law and service levels must be set by the operator with legal advice before public launch.</p>
           </>
         )}
+      </section>
+    </PublicLayout>
+  );
+}
+export function Cookies() {
+  return (
+    <PublicLayout>
+      <section className="page-hero container">
+        <Eyebrow>COOKIES</Eyebrow>
+        <h1>
+          One cookie.
+          <br />
+          <span>Strictly necessary.</span>
+        </h1>
+        <p>SCOPE uses no advertising, analytics or tracking cookies, so there is nothing to consent to.</p>
+      </section>
+      <section className="container prose">
+        <table className="plan-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">scope_session</th>
+              <td>Keeps you signed in. HttpOnly, SameSite=Lax, Secure over HTTPS. Set only when you log in.</td>
+              <td>Up to 30 days, or until you log out</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>Fonts are served from SCOPE itself; no third-party requests are made when you browse the site. If you subscribe, the payment provider’s own checkout pages set their own cookies under their policy.</p>
       </section>
     </PublicLayout>
   );

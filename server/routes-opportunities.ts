@@ -103,7 +103,9 @@ export function opportunityRoutes(ctx: Ctx) {
         const { conditions, role, match, ...summary } = o;
         void conditions;
         void role;
-        return { ...summary, match: { score: match.score, reasons: match.reasons.slice(0, 2) } };
+        const negative = /^No direct|not (established|published)|outside|Outside|passed|replaces|result notice|90 days/;
+        const reasons = [...match.reasons.filter((r) => !negative.test(r)), ...match.reasons.filter((r) => negative.test(r))];
+        return { ...summary, match: { score: match.score, reasons: reasons.slice(0, 2) } };
       }),
       total: records.length,
       closedHidden: status === "active" ? all.filter((o) => closed(o.lifecycle)).length : 0,
