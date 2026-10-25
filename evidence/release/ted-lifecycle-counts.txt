@@ -1,0 +1,5 @@
+[
+  [Object: null prototype] { lifecycle: 'result_published', n: 23 },
+  [Object: null prototype] { lifecycle: 'superseded', n: 63 },
+  [Object: null prototype] { lifecycle: 'unknown', n: 264 }
+] [Object: null prototype] { n: 353 } [Object: null prototype] { n: 350 }

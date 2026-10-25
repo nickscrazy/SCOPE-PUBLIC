@@ -1,0 +1,9 @@
+# Clean checkout of 4b8aced at 2026-10-25T22:50:38Z
+v24.22.1
+11.19.1
+ls: cannot access 'node_modules': No such file or directory
+ls: cannot access 'dist': No such file or directory
+ls: cannot access 'data': No such file or directory
+npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.

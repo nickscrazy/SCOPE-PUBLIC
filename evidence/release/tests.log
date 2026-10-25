@@ -1,0 +1,127 @@
+
+> scope-intelligence@1.0.0-rc.1 test
+> vitest run
+
+
+ RUN  v4.1.12 /tmp/claude-0/clean
+
+{"time":"2026-10-25T22:50:56.586Z","level":"info","event":"http.request","id":"99ae6982-9c8a-47b0-89ad-fdf8ba63addb","method":"POST","route":"/auth/login","status":401,"ms":48}
+{"time":"2026-10-25T22:50:56.873Z","level":"warn","event":"email.disabled","tag":"verify_email"}
+{"time":"2026-10-25T22:50:57.033Z","level":"warn","event":"email.disabled","tag":"verify_email"}
+{"time":"2026-10-25T22:50:57.099Z","level":"info","event":"http.request","id":"9b3fd6db-7037-46bf-8708-d652e9f89163","method":"POST","route":"/trial","status":409,"ms":1}
+{"time":"2026-10-25T22:50:57.229Z","level":"info","event":"http.request","id":"9ece3fdf-9545-4ce8-8f6d-686a541a51ce","method":"GET","route":"/opportunities/:id","status":402,"ms":1}
+{"time":"2026-10-25T22:50:57.348Z","level":"info","event":"http.request","id":"1131ab06-d3fb-4738-ba78-7f7c5a1be9e7","method":"POST","route":"/saves/:id","status":402,"ms":0}
+{"time":"2026-10-25T22:50:57.360Z","level":"info","event":"http.request","id":"a25854d8-4869-4a8e-a75a-619ca85a0374","method":"GET","route":"/opportunities/:id","status":402,"ms":1}
+{"time":"2026-10-25T22:50:57.584Z","level":"info","event":"http.request","id":"eae12faf-9a4e-4f0f-bfe0-67906927e099","method":"POST","route":"/auth/register","status":400,"ms":2}
+{"time":"2026-10-25T22:50:57.641Z","level":"info","event":"http.request","id":"7da4a7d8-a486-4d0a-af49-71d6f49a234f","method":"PUT","route":"/profile","status":400,"ms":1}
+{"time":"2026-10-25T22:50:57.644Z","level":"info","event":"http.request","id":"1d880460-c8a0-429d-9808-b57048dff395","method":"PUT","route":"/api/profile","status":413,"ms":1}
+{"time":"2026-10-25T22:50:57.647Z","level":"info","event":"http.request","id":"d3d995a2-43f2-4428-b2f3-baeacb65b066","method":"GET","route":"/opportunities/:id","status":404,"ms":1}
+{"time":"2026-10-25T22:50:57.751Z","level":"info","event":"http.request","id":"e4f1d5e3-5a5a-43a3-8310-1885ddceab1f","method":"POST","route":"/auth/register","status":400,"ms":1}
+{"time":"2026-10-25T22:50:57.753Z","level":"info","event":"http.request","id":"149eb503-b44b-40a4-bd8d-e600d7c67dfb","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.755Z","level":"info","event":"http.request","id":"70182bcb-8c1d-47c0-a350-b71c6447c116","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.757Z","level":"info","event":"http.request","id":"b6adcdb7-2c42-4e83-803b-40980dd33c47","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.758Z","level":"info","event":"http.request","id":"2ecb9944-55e6-4602-bf0d-b8bff7c9080f","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.760Z","level":"info","event":"http.request","id":"309ecf6e-2066-4d0a-be1b-6d12785f883d","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.762Z","level":"info","event":"http.request","id":"45f5d5c8-ebc5-4ee3-945f-d6b6e6c8b854","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.764Z","level":"info","event":"http.request","id":"d81127f2-3b37-4e41-b91d-bfb9d659b93c","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.765Z","level":"info","event":"http.request","id":"3c69384c-91d1-424d-b4e7-d4f5ca4a59ae","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:57.767Z","level":"info","event":"http.request","id":"faabe00f-c0c5-448b-8d1f-6d7f0c57abf6","method":"POST","route":"/auth/register","status":400,"ms":0}
+{"time":"2026-10-25T22:50:58.726Z","level":"error","event":"ingestion.ted_sync","status":"failed","count":0,"error":"TED HTTP 503","trigger":"test"}
+{"time":"2026-10-25T22:50:58.727Z","level":"error","event":"ingestion.ted_sync","status":"failed","count":0,"error":"TED HTTP 503","trigger":"test"}
+{"time":"2026-10-25T22:50:58.729Z","level":"error","event":"ingestion.ted_sync","status":"failed","count":0,"error":"TED HTTP 503","trigger":"test"}
+{"time":"2026-10-25T22:50:58.731Z","level":"info","event":"ingestion.ted_sync","status":"success","count":1,"trigger":"test","capped":false}
+{"time":"2026-10-25T22:50:58.736Z","level":"info","event":"ingestion.ted_sync","status":"success","count":0,"trigger":"test","capped":false}
+{"time":"2026-10-25T22:50:58.908Z","level":"info","event":"http.request","id":"359b30e6-8949-429f-8060-1392f60993a1","method":"POST","route":"/api/inbound/email","status":401,"ms":2}
+{"time":"2026-10-25T22:50:58.913Z","level":"info","event":"http.request","id":"f639bfab-f140-4b97-8a7e-5cedbaeabb61","method":"POST","route":"/api/inbound/email","status":401,"ms":1}
+{"time":"2026-10-25T22:50:58.919Z","level":"info","event":"http.request","id":"5a46ba7b-4db9-49b8-841c-25d0243f77b0","method":"POST","route":"/api/inbound/email","status":202,"ms":3}
+{"time":"2026-10-25T22:50:58.924Z","level":"info","event":"http.request","id":"b23b8051-4490-47e2-87bd-fefed4ad4798","method":"POST","route":"/api/inbound/email","status":200,"ms":2}
+{"time":"2026-10-25T22:50:59.009Z","level":"info","event":"http.request","id":"4a3c6638-89f4-41e1-a23a-400f8ce2b0a4","method":"POST","route":"/admin/inbound/:id/import","status":409,"ms":1}
+{"time":"2026-10-25T22:50:59.018Z","level":"info","event":"http.request","id":"438b2ed6-2ffd-4ad9-93be-95f075ad85ae","method":"POST","route":"/api/inbound/email","status":404,"ms":0}
+{"time":"2026-10-25T22:50:59.202Z","level":"info","event":"http.request","id":"409a9a33-edf7-4314-9cd2-396a6e3c5550","method":"POST","route":"/admin/drafts/:id/submit","status":400,"ms":2}
+{"time":"2026-10-25T22:50:59.209Z","level":"info","event":"http.request","id":"2615184a-4d7e-4bb4-a476-8abb225fc038","method":"PUT","route":"/admin/drafts/:id","status":409,"ms":1}
+{"time":"2026-10-25T22:50:59.213Z","level":"info","event":"http.request","id":"d03b14b9-63a8-4635-9339-83b2fd619981","method":"POST","route":"/admin/drafts/:id/decision","status":400,"ms":2}
+{"time":"2026-10-25T22:50:59.412Z","level":"info","event":"http.request","id":"9402df36-a1da-4169-8d41-ebab5ef31853","method":"POST","route":"/admin/drafts/:id/decision","status":403,"ms":1}
+{"time":"2026-10-25T22:50:59.414Z","level":"info","event":"http.request","id":"3e1608cc-f021-4167-8e6b-26c62c19a5c2","method":"POST","route":"/admin/drafts/:id/decision","status":403,"ms":0}
+{"time":"2026-10-25T22:50:59.655Z","level":"info","event":"http.request","id":"e61cf2f7-0959-4e69-9292-bf37bce4f634","method":"POST","route":"/admin/drafts","status":400,"ms":1}
+{"time":"2026-10-25T22:50:59.658Z","level":"info","event":"http.request","id":"7617e30f-9ad0-407e-a649-dfaf4998cca4","method":"POST","route":"/admin/drafts","status":400,"ms":1}
+{"time":"2026-10-25T22:50:59.661Z","level":"info","event":"http.request","id":"2601f85c-efe3-4b01-b0d8-0e555d1098ea","method":"POST","route":"/admin/drafts","status":400,"ms":1}
+{"time":"2026-10-25T22:50:59.663Z","level":"info","event":"http.request","id":"32812227-8edd-42ba-bdf4-3ebf4af41434","method":"POST","route":"/admin/catalogue/:id/retire","status":403,"ms":0}
+{"time":"2026-10-25T22:50:59.670Z","level":"info","event":"http.request","id":"f90f442d-f653-41e2-8d26-2b41471fd40b","method":"POST","route":"/saves/:id","status":404,"ms":1}
+{"time":"2026-10-25T22:50:59.980Z","level":"info","event":"maintenance.completed","sessions":2,"tokens":2,"rateLimits":2,"unverifiedAccounts":1,"analyses":0,"audit":1,"syncRuns":0,"billingEvents":0,"inbound":0}
+{"time":"2026-10-25T22:51:00.601Z","level":"info","event":"http.request","id":"3f085db1-6177-4dd4-8b50-0b16368fdc3b","method":"POST","route":"/trial","status":403,"ms":2}
+{"time":"2026-10-25T22:51:00.618Z","level":"info","event":"http.request","id":"6ff3f220-46db-4f25-8b08-373d05f40d7e","method":"POST","route":"/auth/verify-email","status":400,"ms":1}
+{"time":"2026-10-25T22:51:00.687Z","level":"info","event":"http.request","id":"afbd72f4-5e28-4190-a6b1-9c75d09d2a33","method":"POST","route":"/auth/verify-email","status":400,"ms":1}
+{"time":"2026-10-25T22:51:00.694Z","level":"info","event":"http.request","id":"1028348d-c1d5-4e96-ab7e-a7dada0df298","method":"POST","route":"/auth/verify-email","status":400,"ms":2}
+{"time":"2026-10-25T22:51:00.697Z","level":"info","event":"http.request","id":"72fb27be-6a4d-4ffa-a085-ea3876dc2009","method":"POST","route":"/auth/verify-email","status":400,"ms":1}
+{"time":"2026-10-25T22:51:00.703Z","level":"info","event":"http.request","id":"da602ba4-5c9b-45ac-8950-6360e9e5f621","method":"POST","route":"/auth/verify-email","status":400,"ms":0}
+{"time":"2026-10-25T22:51:00.802Z","level":"info","event":"http.request","id":"e62fab78-360a-4df4-a2f3-a28d4c0b7dc0","method":"POST","route":"/auth/verify-email","status":400,"ms":1}
+{"time":"2026-10-25T22:51:01.148Z","level":"info","event":"http.request","id":"05205faa-335b-4055-af7f-d683ca7e3144","method":"POST","route":"/auth/reset-password","status":400,"ms":52}
+{"time":"2026-10-25T22:51:01.218Z","level":"info","event":"http.request","id":"867de8d1-c649-4816-898b-7b4c812cc35f","method":"POST","route":"/auth/login","status":401,"ms":62}
+{"time":"2026-10-25T22:51:01.397Z","level":"info","event":"http.request","id":"6918f5cd-7296-417d-84a6-5bfd3ca80ead","method":"POST","route":"/auth/reset-password","status":400,"ms":45}
+{"time":"2026-10-25T22:51:01.580Z","level":"info","event":"http.request","id":"414adcb7-76e4-4cb6-be4b-38f4caaaa83b","method":"POST","route":"/account/password","status":403,"ms":68}
+{"time":"2026-10-25T22:51:01.816Z","level":"info","event":"http.request","id":"5e3f572b-5bc9-4c4e-98e3-4f393edac2cd","method":"DELETE","route":"/account/sessions/:id","status":404,"ms":1}
+{"time":"2026-10-25T22:51:02.011Z","level":"info","event":"http.request","id":"3fd4ac28-bcea-4f69-96f8-f88d99e9adae","method":"POST","route":"/auth/login","status":401,"ms":79}
+{"time":"2026-10-25T22:51:02.061Z","level":"info","event":"http.request","id":"2799ae20-72b5-4d84-b02e-595011e37726","method":"POST","route":"/auth/login","status":401,"ms":47}
+{"time":"2026-10-25T22:51:02.107Z","level":"info","event":"http.request","id":"8e5ec52a-30bf-468a-8af8-6366aa983884","method":"POST","route":"/auth/login","status":401,"ms":44}
+{"time":"2026-10-25T22:51:02.151Z","level":"info","event":"http.request","id":"616af198-46eb-47ea-85c0-9112ebf970af","method":"POST","route":"/auth/login","status":401,"ms":43}
+{"time":"2026-10-25T22:51:02.202Z","level":"info","event":"http.request","id":"c9cc9dfc-ccb9-41b4-b6d7-e9d8efa69772","method":"POST","route":"/auth/login","status":401,"ms":48}
+{"time":"2026-10-25T22:51:02.249Z","level":"info","event":"http.request","id":"3e54c581-4751-4385-88bb-657b9a39b0d2","method":"POST","route":"/auth/login","status":401,"ms":45}
+{"time":"2026-10-25T22:51:02.294Z","level":"info","event":"http.request","id":"972f76b1-6cb9-416e-b586-fdd105e938f9","method":"POST","route":"/auth/login","status":401,"ms":43}
+{"time":"2026-10-25T22:51:02.343Z","level":"info","event":"http.request","id":"0795d08a-d6d4-4531-9e7b-e167d9de8cac","method":"POST","route":"/auth/login","status":401,"ms":47}
+{"time":"2026-10-25T22:51:02.400Z","level":"info","event":"http.request","id":"80416fdf-87b3-4c81-9022-a6e107aa9f17","method":"POST","route":"/auth/login","status":401,"ms":54}
+{"time":"2026-10-25T22:51:02.463Z","level":"info","event":"http.request","id":"c5e5ecd6-ccb4-4306-ba66-3311ffc194ab","method":"POST","route":"/auth/login","status":401,"ms":61}
+{"time":"2026-10-25T22:51:02.578Z","level":"info","event":"http.request","id":"e3079821-71c9-43ed-bf03-06c3c65392a1","method":"POST","route":"/account/email","status":403,"ms":42}
+{"time":"2026-10-25T22:51:02.784Z","level":"info","event":"http.request","id":"f8b23c6d-dd6d-4f00-bc54-83c740dee21b","method":"POST","route":"/auth/verify-email","status":409,"ms":1}
+{"time":"2026-10-25T22:51:03.016Z","level":"info","event":"http.request","id":"fdbbdc7e-aca7-4849-8c9a-fad6a6f32326","method":"DELETE","route":"/account","status":400,"ms":2}
+{"time":"2026-10-25T22:51:03.087Z","level":"info","event":"http.request","id":"bc8d63c3-a9b9-4346-97ec-6f52e83700f1","method":"DELETE","route":"/account","status":403,"ms":69}
+{"time":"2026-10-25T22:51:03.285Z","level":"info","event":"http.request","id":"75c27252-9702-468f-9ecb-8e8575185f0a","method":"GET","route":"/admin/overview","status":403,"ms":1}
+{"time":"2026-10-25T22:51:03.288Z","level":"info","event":"http.request","id":"69cc4a0f-b36b-48e2-8e0f-e90cc5a3c53b","method":"GET","route":"/admin/catalogue","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.289Z","level":"info","event":"http.request","id":"8e1c05b6-ca58-45be-aeac-adbabd29349b","method":"POST","route":"/admin/ted-sync","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.291Z","level":"info","event":"http.request","id":"90a2b48d-f6d7-4bed-8e13-de1a1c9f62d6","method":"POST","route":"/admin/drafts","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.293Z","level":"info","event":"http.request","id":"76fd2892-1205-4319-9fc0-626b7e17ba4a","method":"GET","route":"/admin/audit","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.295Z","level":"info","event":"http.request","id":"b4f4b6cf-81a0-4ec7-b0a9-4160280bfa92","method":"POST","route":"/admin/incidents","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.366Z","level":"info","event":"http.request","id":"00bcf696-e8d4-4cde-94ea-9ac848d5e4d4","method":"GET","route":"/admin/overview","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.426Z","level":"info","event":"http.request","id":"6841f42b-7c5c-4a63-9ab8-ec1b93433d07","method":"POST","route":"/admin/ted-sync","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.428Z","level":"info","event":"http.request","id":"709f052d-2190-4825-8001-7e03e11693e2","method":"POST","route":"/admin/incidents","status":403,"ms":0}
+{"time":"2026-10-25T22:51:03.430Z","level":"info","event":"http.request","id":"b45117f8-98de-4866-9fe5-b9abcc2286ff","method":"POST","route":"/admin/drafts/:id/decision","status":403,"ms":0}
+{"time":"2026-10-25T22:51:04.195Z","level":"warn","event":"billing.webhook_rejected"}
+{"time":"2026-10-25T22:51:04.196Z","level":"info","event":"http.request","id":"3ad36cae-0d98-4a07-b109-ef558edc2cf4","method":"POST","route":"/api/billing/webhook","status":400,"ms":1}
+{"time":"2026-10-25T22:51:04.201Z","level":"warn","event":"billing.webhook_rejected"}
+{"time":"2026-10-25T22:51:04.201Z","level":"info","event":"http.request","id":"71f02a6e-5a79-43e8-93e6-6c35292749be","method":"POST","route":"/api/billing/webhook","status":400,"ms":0}
+{"time":"2026-10-25T22:51:04.205Z","level":"info","event":"billing.webhook","type":"checkout.session.completed","outcome":"linked"}
+{"time":"2026-10-25T22:51:04.206Z","level":"info","event":"http.request","id":"c99ff341-b282-43f9-bc61-b71e6e60a749","method":"POST","route":"/api/billing/webhook","status":200,"ms":2}
+{"time":"2026-10-25T22:51:04.209Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.209Z","level":"info","event":"http.request","id":"f99fcd93-5804-4e01-b0f6-53864568c3dd","method":"POST","route":"/api/billing/webhook","status":200,"ms":2}
+{"time":"2026-10-25T22:51:04.306Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.306Z","level":"info","event":"http.request","id":"747ff332-6bda-41be-a649-38cfdefaff4a","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.309Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"duplicate"}
+{"time":"2026-10-25T22:51:04.310Z","level":"info","event":"http.request","id":"912e9d27-7482-4aba-8db2-0ecfb6918a7e","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.313Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"stale"}
+{"time":"2026-10-25T22:51:04.313Z","level":"info","event":"http.request","id":"b28498fc-4bc6-4946-8700-4f32b0e02c94","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.318Z","level":"info","event":"billing.webhook","type":"customer.subscription.deleted","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.318Z","level":"info","event":"http.request","id":"5eff98db-6c4b-4a20-a9f7-6ef527ad9a83","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.384Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.385Z","level":"info","event":"http.request","id":"80bda226-0a3e-4dfe-bf9a-1f978ca8e405","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.460Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.461Z","level":"info","event":"http.request","id":"bc93af8a-7b5b-4391-a604-6c04bcd203e0","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.517Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.517Z","level":"info","event":"http.request","id":"2c41ca15-38ce-418f-856a-a8dd9717fdc7","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.521Z","level":"info","event":"billing.webhook","type":"checkout.session.completed","outcome":"unknown_user"}
+{"time":"2026-10-25T22:51:04.521Z","level":"info","event":"http.request","id":"a0e7c404-5ee0-4ff3-ba54-80ebd2211229","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.576Z","level":"info","event":"http.request","id":"5bdb8be5-c15c-46c1-a255-ed5430d63b9c","method":"POST","route":"/billing/checkout","status":403,"ms":1}
+{"time":"2026-10-25T22:51:04.630Z","level":"info","event":"billing.webhook","type":"checkout.session.completed","outcome":"linked"}
+{"time":"2026-10-25T22:51:04.631Z","level":"info","event":"http.request","id":"53a9acb8-2b7b-483c-9083-5941a34b9c14","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.633Z","level":"info","event":"billing.webhook","type":"customer.subscription.updated","outcome":"applied"}
+{"time":"2026-10-25T22:51:04.633Z","level":"info","event":"http.request","id":"43b9a0fa-77d8-4042-93b7-b4443b1e0744","method":"POST","route":"/api/billing/webhook","status":200,"ms":1}
+{"time":"2026-10-25T22:51:04.748Z","level":"info","event":"http.request","id":"715f098b-2511-47c6-a26b-45d30424b3b4","method":"POST","route":"/billing/checkout","status":503,"ms":1}
+{"time":"2026-10-25T22:51:04.750Z","level":"info","event":"http.request","id":"2a1d02a7-05d6-43be-ac52-b1bffc3e4ab8","method":"POST","route":"/api/billing/webhook","status":404,"ms":0}
+{"time":"2026-10-25T22:51:04.752Z","level":"info","event":"http.request","id":"1e36618d-ebb0-4b15-ae31-e1041ddb8c8f","method":"GET","route":"/api/config","status":200,"ms":0}
+{"time":"2026-10-25T22:51:05.623Z","level":"info","event":"email.sent","tag":"reset_password"}
+{"time":"2026-10-25T22:51:05.629Z","level":"error","event":"email.failed","tag":"password_changed","error":"Error"}
+
+ Test Files  6 passed (6)
+      Tests  81 passed (81)
+   Start at  22:50:55
+   Duration  10.01s (transform 431ms, setup 0ms, import 1.90s, tests 7.25s, environment 1ms)
+
+test exit 0

@@ -1,0 +1,16 @@
+
+Running 10 tests using 1 worker
+
+  ✓   1 tests/browser/product.spec.ts:49:1 › public pages: clear purpose, honest pricing, SEO, mobile menu, keyboard and reduced motion (4.1s)
+  ✓   2 tests/browser/product.spec.ts:90:1 › demo materially reranks and updates unknown certification evidence (1.1s)
+  ✓   3 tests/browser/product.spec.ts:109:1 › sign up, confirm email from the delivered link, onboard, inspect evidence, save, and return in a new session (4.9s)
+  ✓   4 tests/browser/product.spec.ts:179:1 › password recovery through the emailed link signs out every session (2.3s)
+  ✓   5 tests/browser/product.spec.ts:207:1 › Free quota cannot be overridden in the browser; the trial needs a confirmed email and unlocks analyses (1.3s)
+  ✓   6 tests/browser/product.spec.ts:234:1 › isolates two browser accounts, renders hostile text inertly and blocks the operations area for customers (1.5s)
+  ✓   7 tests/browser/product.spec.ts:275:1 › editor drafts a funding reference; a different reviewer approves it; customers then see it (5.0s)
+  ✓   8 tests/browser/product.spec.ts:329:1 › account export and permanent deletion through settings (2.0s)
+  ✓   9 tests/browser/product.spec.ts:358:1 › no horizontal overflow at 360, 768, 1024 and 1440 across marketing and application (10.3s)
+  ✓  10 tests/browser/product.spec.ts:375:1 › WCAG 2.1 A/AA automated audit of public and authenticated pages (9.9s)
+
+  10 passed (45.4s)
+exit 0

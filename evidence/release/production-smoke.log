@@ -1,0 +1,20 @@
+
+> scope-intelligence@1.0.0-rc.1 smoke:prod
+> tsx scripts/smoke-production.ts
+
+{
+  "status": "PASS",
+  "productionBoot": true,
+  "health": true,
+  "registration": true,
+  "emailVerification": true,
+  "profileWrite": true,
+  "save": true,
+  "processRestart": true,
+  "sessionAfterRestart": true,
+  "profileAfterRestart": true,
+  "saveAfterRestart": true,
+  "staticServingAndCsp": true,
+  "executedAt": "2026-10-25T22:51:19.130Z"
+}
+smoke exit 0

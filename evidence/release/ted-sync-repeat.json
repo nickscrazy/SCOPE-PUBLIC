@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "count": 11,
+  "query": "buyer-country = MLT AND publication-date >= 20261022 AND notice-type IN (cn-standard cn-social) SORT BY publication-date DESC",
+  "runId": "0f7b8204-2efa-486f-8ba0-66d6c4b34a66",
+  "since": "2026-10-22T22:51:30.034Z",
+  "changed": 0,
+  "results": 7,
+  "superseded": 66,
+  "closedByResult": 23,
+  "totalAvailable": 11,
+  "capped": false,
+  "executedAt": "2026-10-25T22:51:38.666Z"
+}

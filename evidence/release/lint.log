@@ -1,0 +1,5 @@
+
+> scope-intelligence@1.0.0-rc.1 lint
+> eslint .
+
+lint exit 0

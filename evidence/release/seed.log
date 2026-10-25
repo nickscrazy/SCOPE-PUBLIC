@@ -1,0 +1,9 @@
+
+> scope-intelligence@1.0.0-rc.1 db:seed
+> tsx server/cli.ts seed
+
+{
+  "references": 3,
+  "changed": 3,
+  "note": "Reviewed references only; no fictional records or accounts. Check dates are preserved."
+}
