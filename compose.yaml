@@ -1,15 +1,29 @@
+# Single-replica deployment. SQLite requires one writer on persistent, local storage.
+# Put a TLS-terminating reverse proxy in front; the app port binds to loopback only.
 services:
   scope:
     build: .
+    image: scope:${SCOPE_VERSION:-local}
+    env_file: ${SCOPE_ENV_FILE:-.env.production}
     ports:
-      - '127.0.0.1:3000:3000'
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      DATABASE_PATH: /data/scope.db
-      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      - "127.0.0.1:${SCOPE_PORT:-3000}:3000"
     volumes:
       - scope-data:/data
+      - scope-backups:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 volumes:
   scope-data:
+  scope-backups:

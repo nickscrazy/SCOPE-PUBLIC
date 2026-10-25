@@ -1,10 +1,14 @@
 node_modules
 dist
 .git
+.github
 .env
+.env.*
 data
+backups
 playwright-report
 test-results
-evidence/screenshots
-evidence/*.html
-evidence/*.log
+evidence
+tests
+*.db
+*.db-*

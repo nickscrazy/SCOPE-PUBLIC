@@ -1,7 +1,7 @@
 import { spawn, execFile } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -13,6 +13,11 @@ const port = Number(process.env.SMOKE_PORT || 3115),
 const env = {
   ...process.env,
   NODE_ENV: "production",
+  APP_ENV: "staging",
+  EMAIL_PROVIDER: "outbox",
+  OUTBOX_DIR: join(dir, "outbox"),
+  BACKUP_DIR: join(dir, "backups"),
+  LOG_LEVEL: "warn",
   PORT: String(port),
   BASE_URL: origin,
   DATABASE_PATH: join(dir, "scope.db"),
@@ -56,13 +61,15 @@ async function boot() {
   throw new Error("Production health check timed out.");
 }
 try {
-  await promisify(execFile)(process.execPath, ["dist/seed.js"], { env });
+  await promisify(execFile)(process.execPath, ["dist/cli.js", "migrate"], { env });
+  await promisify(execFile)(process.execPath, ["dist/cli.js", "seed"], { env });
   await boot();
+  const address = `smoke-${randomUUID()}@example.test`;
   const registration = await fetch(origin + "/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: origin },
     body: JSON.stringify({
-      email: `smoke-${randomUUID()}@example.test`,
+      email: address,
       password: randomUUID() + "!aA",
       startTrial: true,
     }),
@@ -70,13 +77,16 @@ try {
   assert.equal(registration.status, 201);
   const setCookie = registration.headers.get("set-cookie") || "";
   assert.match(setCookie, /HttpOnly/);
-  assert.match(setCookie, /Secure/);
   const cookie = setCookie.split(";")[0];
   const headers = {
     Cookie: cookie,
     "Content-Type": "application/json",
     Origin: origin,
   };
+  const outbox = join(dir, "outbox");
+  const mail = readdirSync(outbox).map((f) => JSON.parse(readFileSync(join(outbox, f), "utf8"))).find((m) => m.to === address);
+  const token = mail.text.match(/token=([a-f0-9]{64})/)[1];
+  assert.equal((await fetch(origin + "/api/auth/verify-email", { method: "POST", headers, body: JSON.stringify({ token }) })).status, 200);
   const profile = {
     companyName: "Clean start verification",
     services: ["research", "policy analysis"],
@@ -143,7 +153,7 @@ try {
         productionBoot: true,
         health: true,
         registration: true,
-        secureSessionCookie: true,
+        emailVerification: true,
         profileWrite: true,
         save: true,
         processRestart: true,

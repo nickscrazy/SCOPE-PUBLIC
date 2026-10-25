@@ -12,3 +12,5 @@ test-results/
 playwright-report/
 evidence/**/*.html
 evidence/ted-openapi.json
+.env.production
+.env.staging
