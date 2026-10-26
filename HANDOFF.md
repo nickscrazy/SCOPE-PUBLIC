@@ -51,11 +51,13 @@ Read [RELEASE_REPORT.md](RELEASE_REPORT.md) §2 (findings) and [SECURITY.md](SEC
 
 ## Focused re-review of the repair round
 
-**Commit under review: `46c5c17`** on `claude/review-repairs-p1-p2`, parent `e89af21`.
-Everything in this round is in that one commit. Start with [REPAIR_REPORT.md](REPAIR_REPORT.md).
+**Branch `claude/review-repairs-p1-p2`, based on `e89af21`.** Two commits: `46c5c17` is the
+whole code and test change, `c4bc56a` adds this documentation and the round's evidence. Review
+the branch head. Start with [REPAIR_REPORT.md](REPAIR_REPORT.md).
 
 ```bash
-git diff e89af21..46c5c17 --stat
+git diff e89af21..HEAD --stat          # everything in the round
+git show 46c5c17 --stat                # code and tests only
 npm ci && npm run lint && npm run typecheck && npm test && npm run build
 npm run test:e2e                      # runs on Windows and Linux
 docker build -t scope:rc . && npx tsx scripts/container-test.ts
@@ -83,7 +85,7 @@ trade that removes the lockout.
 The commit is additive and touches no migration, so reverting is safe and needs no data work:
 
 ```bash
-git revert --no-commit 46c5c17 && git commit -m "Revert repair round"
+git revert --no-commit c4bc56a 46c5c17 && git commit -m "Revert repair round"
 # or, to return to the reviewed baseline exactly:
 git checkout e89af21
 npm ci && npm run build
