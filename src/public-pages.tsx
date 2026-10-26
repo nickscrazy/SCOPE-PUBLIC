@@ -760,7 +760,7 @@ export function Sources() {
           to import contract notices from Maltese buyers, refreshed twice a day over a rolling 90-day window. TED publishes notices above EU thresholds and some below; it does not contain every Maltese public tender.
         </p>
         <p>
-          Notices that belong to the same procedure are linked. When a buyer publishes a change notice, the earlier notice is marked as replaced. When a result (award) notice appears, the procedure is marked as closed. Notices whose deadline has passed are hidden from Discover by default. Deadlines are only shown when the notice states a single, time-zoned closing time; multi-lot deadlines stay “not confirmed”.
+          Notices that belong to the same procedure are linked. When a buyer publishes a change notice, the earlier notice is marked as replaced. When a result (award) notice appears, the procedure is marked as closed. Notices whose deadline has passed are hidden from Discover by default. A notice that lists several lots is read lot by lot: it stays open while any lot is still open, shows that lot as its deadline, and is only treated as closed once every lot has passed. Where the source states a date but no closing time, the end of that day is used and labelled as such. If any lot cannot be read, the status stays “not confirmed” rather than being guessed either way.
         </p>
         <h2>Maltese funding programmes and tax credits</h2>
         <p>

@@ -11,7 +11,9 @@ const config = loadConfig();
 configureLogging(config.LOG_LEVEL);
 const db = openDatabase(config.DATABASE_PATH, { migrationsDir: config.MIGRATIONS_DIR });
 const app = createApp(db, { config });
-const serveBuild = process.env.NODE_ENV === "production";
+// The built client is served whenever this is a real deployment, so `start` needs no
+// shell-specific environment prefix and behaves the same on every platform.
+const serveBuild = process.env.NODE_ENV === "production" || config.APP_ENV !== "development";
 if (serveBuild) {
   const { default: express } = await import("express");
   app.use(

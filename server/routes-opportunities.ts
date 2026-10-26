@@ -4,7 +4,7 @@ import type { Ctx } from "./context.js";
 import { HttpError, userOf } from "./context.js";
 import { allOpportunities, transaction } from "./db.js";
 import { account, audit, FREE_ANALYSES } from "./auth.js";
-import { matchOpportunity, freshness, currentLifecycle } from "./matching.js";
+import { matchOpportunity, freshness, currentLifecycle, effectiveDeadline } from "./matching.js";
 import { emptyProfile, opportunityTypes, type Opportunity, type Profile } from "../src/domain.js";
 
 export function opportunityRoutes(ctx: Ctx) {
@@ -38,7 +38,14 @@ export function opportunityRoutes(ctx: Ctx) {
       records: allOpportunities(db)
         .filter((o) => o.status !== "fictional")
         .map((o) => {
-          const withState: Opportunity = { ...o, lifecycle: currentLifecycle(o, now), stale: o.source === "TED" && ted.stale };
+          // The deadline is resolved here, not at ingestion: with several lot deadlines the
+          // one that matters is the next still open, and which that is depends on today.
+          const withState: Opportunity = {
+            ...o,
+            deadline: effectiveDeadline(o, now),
+            lifecycle: currentLifecycle(o, now),
+            stale: o.source === "TED" && ted.stale,
+          };
           return {
             ...withState,
             match: matchOpportunity(p, withState, now),

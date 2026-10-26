@@ -40,8 +40,9 @@ export function createApp(db: DB, options: AppOptions = {}) {
   const clock = options.clock || (() => new Date());
   const mailer = options.mailer ?? createMailer(config);
   const billing = createBilling(config, options.billingFetcher);
-  const { allow, limited } = makeLimiter(db, clock, config.RATE_LIMIT_MULTIPLIER);
-  const ctx: Ctx = { db, config, clock, mailer, billing, allow, limited, tedFetcher: options.tedFetcher ?? fetch };
+  const limiter = makeLimiter(db, clock, config.RATE_LIMIT_MULTIPLIER);
+  const { allow } = limiter;
+  const ctx: Ctx = { db, config, clock, mailer, billing, ...limiter, tedFetcher: options.tedFetcher ?? fetch };
   const allowedOrigin = new URL(config.BASE_URL).origin;
   const app = express();
   app.disable("x-powered-by");

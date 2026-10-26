@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/server.js && esbuild server/cli.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/cli.js",
-    "start": "NODE_ENV=production node dist/server.js",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check server src tests scripts",
@@ -18,7 +18,7 @@
     "smoke:prod": "tsx scripts/smoke-production.ts",
     "db:migrate": "tsx server/cli.ts migrate",
     "db:seed": "tsx server/cli.ts seed",
-    "sync:ted": "NODE_USE_ENV_PROXY=1 tsx server/cli.ts sync-ted",
+    "sync:ted": "tsx --use-env-proxy server/cli.ts sync-ted",
     "import:grants": "tsx server/cli.ts import-grants",
     "admin:role": "tsx server/cli.ts admin-role",
     "backup": "tsx server/cli.ts backup",
@@ -27,7 +27,7 @@
     "maintenance": "tsx server/cli.ts maintenance",
     "db:migrate:prod": "node dist/cli.js migrate",
     "db:seed:prod": "node dist/cli.js seed",
-    "sync:ted:prod": "NODE_USE_ENV_PROXY=1 node dist/cli.js sync-ted"
+    "sync:ted:prod": "node --use-env-proxy dist/cli.js sync-ted"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.0",

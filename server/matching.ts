@@ -218,7 +218,9 @@ export function matchOpportunity(
     (p.interests === "tenders" && o.type !== "tender") ||
     (p.interests === "grants" && o.type === "tender");
   if (outsideInterest) score = Math.round(score * W.outsideInterest);
-  const deadlinePassed = !!o.deadline && new Date(o.deadline) < now;
+  // Every lot must have closed before the subject is treated as past; a single open lot keeps
+  // the record actionable and undiscounted.
+  const deadlinePassed = currentLifecycle(o, now) === "deadline_passed";
   const closed =
     deadlinePassed ||
     (!!o.lifecycle && closedLifecycles.includes(o.lifecycle));
@@ -461,6 +463,10 @@ export function freshness(o: Opportunity, now = new Date()): string {
   if (o.lifecycle === "superseded") return "Replaced by a later notice";
   if (o.lifecycle === "result_published")
     return "Result published · procedure closed";
+  if (currentLifecycle(o, now) === "deadline_passed")
+    return o.lotDeadlines && o.lotDeadlines.length > 1
+      ? "Every lot deadline has passed"
+      : "Submission deadline has passed";
   if (o.stale) return "Source refresh overdue · cached record";
   if (!o.verifiedAt) return "Status requires confirmation";
   if (o.type === "tender") return "Published notice · verify current documents";
@@ -471,10 +477,38 @@ export function freshness(o: Opportunity, now = new Date()): string {
   return "Reference checked · opening status unconfirmed";
 }
 
-/** Lifecycle as seen at read time: a stored state plus the deadline clock. */
+/**
+ * The deadline a customer should act on, resolved at read time.
+ * With several lot deadlines it is the next one still open; once they have all passed it is
+ * the last of them, so a closed record states when it actually closed.
+ */
+export function effectiveDeadline(
+  o: Opportunity,
+  now = new Date(),
+): string | null {
+  const lots = o.lotDeadlines;
+  if (!lots?.length) return o.deadline;
+  const next = lots.find((d) => new Date(d) > now);
+  return next ?? lots[lots.length - 1];
+}
+
+/**
+ * Lifecycle as seen at read time: a stored state plus the deadline clock.
+ *
+ * A record with lots is open while any lot is still open. It is only closed once every lot
+ * has passed **and** every lot entry was readable — an incomplete set stays `unknown`, because
+ * a lot we failed to parse could still be open. `unknown` is never reported as open.
+ */
 export function currentLifecycle(o: Opportunity, now = new Date()) {
   if (o.lifecycle === "superseded" || o.lifecycle === "result_published")
     return o.lifecycle;
+  const lots = o.lotDeadlines;
+  if (lots?.length) {
+    if (lots.some((d) => new Date(d) > now)) return "open" as const;
+    return o.deadlinesComplete === false
+      ? ("unknown" as const)
+      : ("deadline_passed" as const);
+  }
   if (o.deadline) return new Date(o.deadline) < now ? "deadline_passed" : "open";
   return "unknown" as const;
 }
