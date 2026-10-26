@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { DB } from "./db.js";
 import { transaction, upsertOpportunities } from "./db.js";
 import type { Opportunity } from "../src/domain.js";
+import { log } from "./log.js";
 export const TED_URL = "https://api.ted.europa.eu/v3/notices/search";
 export const TED_FIELDS = [
   "publication-number",
@@ -89,6 +90,54 @@ const sectorMap: Record<string, string> = {
   "92": "culture",
   "98": "services",
 };
+const LOT_DATE = /^(\d{4}-\d{2}-\d{2})(Z|[+-]\d{2}:\d{2})?$/;
+const LOT_TIME = /^(\d{2}:\d{2}:\d{2})(Z|[+-]\d{2}:\d{2})?$/;
+/**
+ * Submission deadlines, one entry per lot. TED states the date and the time in separate
+ * parallel arrays; the time carries the authoritative UTC offset and entries pair by position.
+ *
+ * Two safeguards keep an open lot from being treated as closed:
+ *  - a lot with a date but no readable time falls back to the end of that day, an upper bound,
+ *    and is flagged approximate rather than presented as a stated closing time;
+ *  - if any entry cannot be read at all, `complete` is false and the caller must not infer
+ *    closure from the entries that did parse.
+ */
+export function parseLotDeadlines(rawDates: unknown, rawTimes: unknown) {
+  const list = (v: unknown) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
+  const dates = list(rawDates),
+    times = list(rawTimes);
+  const values: string[] = [];
+  let complete = true,
+    approximate = false;
+  // Parallel arrays of different lengths mean lots cannot be paired reliably.
+  if (times.length && times.length !== dates.length) complete = false;
+  for (let i = 0; i < dates.length; i++) {
+    const day = LOT_DATE.exec(text(dates[i]));
+    if (!day) {
+      complete = false;
+      continue;
+    }
+    const time = times.length === dates.length ? LOT_TIME.exec(text(times[i])) : null;
+    if (!time) approximate = true;
+    const at = new Date(
+      time
+        ? `${day[1]}T${time[1]}${time[2] ?? day[2] ?? "Z"}`
+        : `${day[1]}T23:59:59${day[2] ?? "Z"}`,
+    );
+    if (Number.isNaN(at.getTime())) {
+      complete = false;
+      continue;
+    }
+    values.push(at.toISOString());
+  }
+  return {
+    values: [...new Set(values)].sort(),
+    lots: dates.length,
+    complete,
+    approximate,
+  };
+}
+
 export function normalizeNotice(
   n: Record<string, unknown>,
   now: Date,
@@ -114,25 +163,14 @@ export function normalizeNotice(
     numberAmount >= 0
       ? numberAmount
       : null;
-  const dates = n["deadline-receipt-tender-date-lot"],
-    times = n["deadline-receipt-tender-time-lot"];
-  let deadline: string | null = null;
-  // Lot deadlines need timezone and lot context. Only a single, explicitly zoned date+time
-  // becomes a notice-wide deadline; anything else remains unknown.
-  if (
-    Array.isArray(dates) &&
-    dates.length === 1 &&
-    Array.isArray(times) &&
-    times.length === 1
-  ) {
-    const day = text(dates[0]).slice(0, 10),
-      time = text(times[0]);
-    if (
-      /^\d{4}-\d{2}-\d{2}$/.test(day) &&
-      /^\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(time)
-    )
-      deadline = dateValue(day + "T" + time);
-  }
+  const lots = parseLotDeadlines(
+    n["deadline-receipt-tender-date-lot"],
+    n["deadline-receipt-tender-time-lot"],
+  );
+  // A notice-wide deadline exists only when every lot shares one closing instant. Where lots
+  // close at different times the record carries the full set and the deadline is resolved at
+  // read time, so a stored value can never go stale.
+  const deadline = lots.values.length === 1 ? lots.values[0] : null;
   const procedure = procedureId.parse(n["procedure-identifier"]) ?? null;
   const isChange = !!text(n["change-notice-version-identifier"]);
   return {
@@ -152,6 +190,10 @@ export function normalizeNotice(
     geography: "Malta",
     value: amount,
     deadline,
+    lotDeadlines: lots.values,
+    lotCount: lots.lots,
+    deadlinesComplete: lots.complete,
+    deadlineApproximate: lots.approximate,
     publishedAt: dateValue(n["publication-date"]),
     fetchedAt: now.toISOString(),
     verifiedAt: now.toISOString(),
@@ -197,6 +239,8 @@ export type SyncResult = {
   closedByResult?: number;
   totalAvailable?: number;
   capped?: boolean;
+  /** Notices the adapter could not read; the rest of the window is still imported. */
+  rejected?: number;
   since?: string;
   query: string;
   error?: string;
@@ -338,7 +382,28 @@ export async function syncTed(
   try {
     const opts = { fetcher, sleep, maxPages, limit };
     const competition = await fetchPages(query, TED_FIELDS, opts);
-    const records = competition.notices.map((n) => normalizeNotice(n, now));
+    // One unreadable notice must not cost the whole window. Each is normalised on its own and
+    // the failures are counted and reported, so a schema change shows up in sync health
+    // instead of silently stopping the feed.
+    const records: Opportunity[] = [];
+    const rejected: string[] = [];
+    for (const n of competition.notices) {
+      try {
+        records.push(normalizeNotice(n, now));
+      } catch {
+        const id = publicationNumber.safeParse(n["publication-number"]);
+        rejected.push(id.success ? id.data : "unidentified");
+      }
+    }
+    // A wholesale failure is a schema break, not a bad record: fail the run so it is retried
+    // and alerted on rather than quietly publishing an empty window.
+    if (competition.notices.length && !records.length)
+      throw new Error("TED notices could not be read: schema may have changed");
+    if (rejected.length)
+      log.warn("ingestion.ted_notice_rejected", {
+        count: rejected.length,
+        sample: rejected.slice(0, 5),
+      });
     const results = await fetchPages(resultQuery, RESULT_FIELDS, opts);
     const resultRows = results.notices.flatMap((n) => {
       const pub = publicationNumber.safeParse(n["publication-number"]);
@@ -367,6 +432,7 @@ export async function syncTed(
       superseded: outcome.superseded,
       closedByResult: outcome.closedByResult,
       totalAvailable: competition.total,
+      rejected: rejected.length,
       capped,
     };
     db.prepare(

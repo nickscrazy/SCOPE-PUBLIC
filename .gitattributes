@@ -1,0 +1,16 @@
+# Normalise text in the repository; the working tree follows the platform except where a
+# file is consumed by a Linux process regardless of where it was checked out.
+* text=auto
+
+# Shell scripts run inside the container. A CRLF shebang makes the kernel look for an
+# interpreter called "/bin/sh\r", so the image builds and then refuses to start.
+*.sh text eol=lf
+deploy/entrypoint.sh text eol=lf
+
+# Dockerfiles and the entrypoint's companions are read by Linux tooling.
+Dockerfile text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+*.png binary
+*.woff2 binary

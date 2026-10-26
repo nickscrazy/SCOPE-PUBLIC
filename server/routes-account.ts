@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Ctx } from "./context.js";
 import { HttpError, tooMany, userOf } from "./context.js";
 import { transaction } from "./db.js";
+import { log } from "./log.js";
 import {
   account,
   audit,
@@ -26,14 +27,54 @@ const email = z
   .email()
   .max(254)
   .transform((s) => s.trim().toLowerCase());
-// NIST SP 800-63B: length over composition rules; 12–128 characters.
+/**
+ * NIST SP 800-63B: length over composition rules; 12–128 characters, plus §5.1.1.2's
+ * screening against values known to be commonly chosen. The list is deliberately small and
+ * shaped around what survives a 12-character minimum — keyboard runs, repeated words and the
+ * handful of long passphrases that appear in every breach corpus — rather than a dictionary
+ * this service has no way to keep current. A credential-stuffing feed belongs in front of it.
+ */
+const COMMON_PASSWORDS = [
+  "password", "passw0rd", "qwerty", "letmein", "welcome", "monkey", "dragon", "football",
+  "baseball", "superman", "trustno1", "iloveyou", "princess", "sunshine", "starwars",
+  "whatever", "freedom", "michael", "jennifer", "computer", "internet", "samsung",
+  "qwertyuiop", "asdfghjkl", "zxcvbnm", "1qaz2wsx", "qazwsxedc", "adminadmin",
+  "administrator", "changeme", "secret", "charlie", "shadow", "master", "hello",
+];
+const isCommon = (p: string) => {
+  const flat = p.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Only digits, or a single character repeated, however long.
+  if (/^\d+$/.test(flat) || /^(.)\1*$/.test(flat)) return true;
+  // A straight keyboard or counting run, e.g. 123456789012.
+  if (/^(?:0123456789|1234567890|123456789|12345678)/.test(flat)) return true;
+  const stripped = flat.replace(/\d+$/, "");
+  return COMMON_PASSWORDS.some((c) => flat === c || stripped === c || flat === c + c);
+};
 const password = z
   .string()
   .min(12, "Use at least 12 characters.")
   .max(128)
-  .refine((p) => new Set(p).size >= 4, "Choose a less repetitive password.");
+  .refine((p) => new Set(p).size >= 4, "Choose a less repetitive password.")
+  .refine(
+    (p) => !isCommon(p),
+    "That password is among the most commonly chosen ones. Pick something only you would write.",
+  );
 const token = z.string().regex(/^[a-f0-9]{64}$/, "This link is invalid.");
 const HOUR = 3600000;
+const LOGIN_WINDOW = 15 * 60000;
+/** Failed sign-ins one client may make before it is refused outright. */
+const IP_FAILURES = 15;
+/** Failed sign-ins against one address before each further failure is slowed. */
+const ACCOUNT_FAILURES_BEFORE_BACKOFF = 10;
+/**
+ * Delay applied to a *failed* sign-in once an address has been guessed at repeatedly.
+ * It never applies to a correct password, so it slows an attacker without giving them a way
+ * to deny the account holder access. Capped so a request cannot be held open indefinitely.
+ */
+export function loginBackoffMs(failures: number, multiplier = 1) {
+  const over = failures - ACCOUNT_FAILURES_BEFORE_BACKOFF * multiplier;
+  return over <= 0 ? 0 : Math.min(2000, 100 * 2 ** (over - 1));
+}
 
 /** Routes that do not need a session. */
 export function publicAuthRoutes(ctx: Ctx) {
@@ -70,18 +111,36 @@ export function publicAuthRoutes(ctx: Ctx) {
     const sent = await sendVerification({ id, email: c.email, trial_requested: trial ? 1 : 0 }, now);
     res.status(201).json({ ok: true, verificationSent: sent });
   });
-  r.post("/auth/login", limited("login", 30, 15 * 60000), async (req, res) => {
+  r.post("/auth/login", limited("login", 30, LOGIN_WINDOW), async (req, res) => {
     const c = z.object({ email, password: z.string().min(1).max(128) }).parse(req.body);
-    // Per-account throttle defeats distributed guessing against one address.
-    if (!allow(`login:account:${c.email}`, 10, 15 * 60000)) {
-      tooMany(res, 15 * 60000);
+    const ipKey = `login-fail:ip:${req.ip}`,
+      accountKey = `login-fail:account:${c.email}`;
+    // Keyed on the caller, so it cannot be driven against somebody else's account. `req.ip`
+    // comes from X-Forwarded-For only when TRUST_PROXY declares the reverse proxy, so a
+    // client cannot spend someone else's budget by spoofing a header.
+    const fromThisClient = ctx.failures(ipKey);
+    if (fromThisClient >= IP_FAILURES * ctx.multiplier) {
+      log.warn("auth.login_throttled", { scope: "client", failures: fromThisClient });
+      tooMany(res, LOGIN_WINDOW);
       return;
     }
     const u = db.prepare("SELECT * FROM users WHERE email=?").get(c.email) as User | undefined;
+    // Equal-cost verification for unknown accounts; the response is identical either way.
     const valid = await verifyPassword(c.password, u?.password_hash || DUMMY_HASH);
     if (!u || !valid) {
+      ctx.penalise(ipKey, LOGIN_WINDOW);
+      const against = ctx.penalise(accountKey, LOGIN_WINDOW);
+      // Sustained guessing against one address is slowed down, but only the failing attempt
+      // waits. The account holder presenting the right password is never delayed or refused,
+      // which is what stops an attacker from locking them out by guessing wrongly.
+      const wait = loginBackoffMs(against, ctx.multiplier);
+      if (wait && config.APP_ENV !== "test") await new Promise((r) => setTimeout(r, wait));
+      log.warn("auth.login_failed", { scope: "account", failures: against, delayedMs: wait });
       throw new HttpError(401, "Email or password is incorrect.");
     }
+    // Proof of the password clears whatever an attacker accumulated against this account.
+    ctx.forgive(accountKey);
+    ctx.forgive(ipKey);
     const now = clock();
     createSession(db, req, res, u.id, now, config.secureCookies);
     audit(db, now, "auth.login", u.id);
@@ -130,7 +189,14 @@ export function publicAuthRoutes(ctx: Ctx) {
     // Identical response whether or not the account exists.
     const respond = () =>
       res.status(202).json({ ok: true, message: "If an account uses that address, a reset link is on its way." });
-    if (!allow(`forgot:account:${c.email}`, 3, HOUR)) return respond();
+    // Caps how many reset emails one address can be sent, so the mailbox cannot be flooded.
+    // It is counted before the account lookup so the response cannot reveal whether the
+    // address exists. A reset link already issued stays valid for its full hour, so hitting
+    // this cap delays a new email rather than denying recovery.
+    if (!allow(`forgot:account:${c.email}`, 5, HOUR)) {
+      log.warn("auth.reset_throttled", { scope: "account" });
+      return respond();
+    }
     const u = db.prepare("SELECT id,email FROM users WHERE email=?").get(c.email) as { id: string; email: string } | undefined;
     if (u) {
       const t = newToken();

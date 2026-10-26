@@ -7,6 +7,7 @@ import { testConfig } from "../server/config";
 import { grantsCatalogue } from "../server/catalogue";
 import { researchProfile } from "../src/domain";
 import { pseudonym } from "../server/auth";
+import { loginBackoffMs } from "../server/routes-account";
 import { captureMailer, cookieOf, registerAccount, tokenFrom } from "./helpers";
 
 const password = "Correct horse battery staple 1";
@@ -113,11 +114,100 @@ describe("password recovery and session revocation", () => {
     expect((await request(app).post("/api/account/sessions/revoke-others").set("Cookie", a).send({})).body.revoked).toBe(1);
     expect((await request(app).get("/api/me").set("Cookie", extra)).status).toBe(401);
   });
-  it("throttles password guessing per account across addresses", async () => {
+});
+
+/**
+ * Regression for the independently reported availability defect: ten wrong guesses against a
+ * known address made the account holder's own correct password return 429, and further guesses
+ * sustained the denial. Throttling must constrain guessing without ever refusing the real
+ * credential.
+ */
+describe("authentication throttling cannot be turned into a lockout", () => {
+  const guess = (email: string, n: number) =>
+    request(app).post("/api/auth/login").send({ email, password: `wrong guess number ${n}` });
+  const signIn = (email: string) => request(app).post("/api/auth/login").send({ email, password });
+
+  it("lets the account holder in while an attacker is guessing at their address", async () => {
     await reg("target@example.com");
-    for (let i = 0; i < 10; i++)
-      await request(app).post("/api/auth/login").set("X-Forwarded-For", `10.0.0.${i}`).send({ email: "target@example.com", password: "guess number " + i });
-    expect((await request(app).post("/api/auth/login").send({ email: "target@example.com", password })).status).toBe(429);
+    for (let i = 0; i < 12; i++) expect((await guess("target@example.com", i)).status).toBe(401);
+    expect((await signIn("target@example.com")).status).toBe(200);
+  });
+
+  it("cannot be sustained: the holder still gets in after continued guessing", async () => {
+    await reg("target@example.com");
+    for (let i = 0; i < 12; i++) await guess("target@example.com", i);
+    expect((await signIn("target@example.com")).status).toBe(200);
+    for (let i = 12; i < 25; i++) await guess("target@example.com", i);
+    expect((await signIn("target@example.com")).status).toBe(200);
+  });
+
+  it("refuses the failing client without touching a different client's access", async () => {
+    // Behind a declared reverse proxy, as production requires, attacker and account holder
+    // are distinguishable. The attacker gets cut off; the holder is unaffected.
+    const proxied = createApp(db, { clock: () => now, mailer, config: testConfig({ TRUST_PROXY: "1" }) });
+    await registerAccount(proxied, mailer, "victim@example.com", password);
+    const attacker = "203.0.113.5",
+      owner = "198.51.100.7";
+    const codes: number[] = [];
+    for (let i = 0; i < 25; i++)
+      codes.push(
+        (
+          await request(proxied)
+            .post("/api/auth/login")
+            .set("X-Forwarded-For", attacker)
+            .send({ email: "victim@example.com", password: `wrong ${i}` })
+        ).status,
+      );
+    expect(codes).toContain(429);
+    const holder = await request(proxied)
+      .post("/api/auth/login")
+      .set("X-Forwarded-For", owner)
+      .send({ email: "victim@example.com", password });
+    expect(holder.status).toBe(200);
+  });
+
+  it("does not let a spoofed forwarding header buy a fresh budget", async () => {
+    await reg("target@example.com");
+    // TRUST_PROXY is unset here, so X-Forwarded-For must not be believed: every one of these
+    // is the same client and they share one budget rather than getting one each.
+    const codes: number[] = [];
+    for (let i = 0; i < 25; i++)
+      codes.push(
+        (
+          await request(app)
+            .post("/api/auth/login")
+            .set("X-Forwarded-For", `10.0.0.${i}`)
+            .send({ email: "target@example.com", password: `spoofed ${i}` })
+        ).status,
+      );
+    expect(codes).toContain(429);
+  });
+
+  it("keeps recovery usable while an address is under attack", async () => {
+    await reg("target@example.com");
+    for (let i = 0; i < 20; i++) await guess("target@example.com", i);
+    const r = await request(app).post("/api/auth/forgot-password").send({ email: "target@example.com" });
+    expect(r.status).toBe(202);
+    expect(tokenFrom(mailer.last("reset_password"))).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("answers identically whether or not the address exists", async () => {
+    await reg("real@example.com");
+    const a = await request(app).post("/api/auth/login").send({ email: "real@example.com", password: "wrong one here" });
+    const b = await request(app).post("/api/auth/login").send({ email: "ghost@example.com", password: "wrong one here" });
+    expect(a.status).toBe(b.status);
+    expect(a.body).toEqual(b.body);
+  });
+
+  it("slows a failing attempt only after repeated failure, and never a successful one", () => {
+    expect(loginBackoffMs(1)).toBe(0);
+    expect(loginBackoffMs(10)).toBe(0);
+    expect(loginBackoffMs(11)).toBe(100);
+    expect(loginBackoffMs(13)).toBe(400);
+    expect(loginBackoffMs(30)).toBe(2000);
+    // A raised test-harness multiplier moves the threshold, it does not remove it.
+    expect(loginBackoffMs(11, 10)).toBe(0);
+    expect(loginBackoffMs(101, 10)).toBe(100);
   });
 });
 

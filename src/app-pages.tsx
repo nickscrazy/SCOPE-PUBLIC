@@ -657,7 +657,11 @@ export function OpportunityDetail() {
             <p>{o.buyer}</p>
             <div className="detail-meta">
               <span>{money(o.value)}</span>
-              <span>Deadline: {o.deadline ? `${date(o.deadline)} (${relativeDays(o.deadline)})` : "not confirmed"}</span>
+              <span>
+                {(o.lotDeadlines?.length ?? 0) > 1 ? "Next lot deadline: " : "Deadline: "}
+                {o.deadline ? `${date(o.deadline)} (${relativeDays(o.deadline)})` : "not confirmed"}
+                {o.deadlineApproximate && o.deadline ? " · closing time not stated" : ""}
+              </span>
               <button className={"button small " + (o.saved ? "outline" : "forest")} onClick={save} aria-pressed={o.saved}>
                 <Bookmark size={16} fill={o.saved ? "currentColor" : "none"} aria-hidden />
                 {o.saved ? "Saved · remove" : "Save opportunity"}
@@ -676,6 +680,8 @@ export function OpportunityDetail() {
                   </>
                 ) : o.lifecycle === "result_published" ? (
                   "TED has published a result notice for this procedure. It is very likely no longer open for bids."
+                ) : (o.lotCount ?? 0) > 1 ? (
+                  `Every published lot deadline has passed (${o.lotCount} lots). Check the source for amendments or extensions.`
                 ) : (
                   "The published deadline has passed. Check the source for amendments or extensions."
                 )}

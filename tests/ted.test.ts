@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { openDatabase, allOpportunities } from "../server/db";
 import type { DB } from "../server/db";
-import { syncTed, normalizeNotice, TED_URL } from "../server/ted";
-import { freshness } from "../server/matching";
+import { syncTed, normalizeNotice, parseLotDeadlines, TED_URL } from "../server/ted";
+import { freshness, currentLifecycle, effectiveDeadline } from "../server/matching";
 let db: DB;
 const now = new Date("2026-10-25T12:00:00Z");
 // Synthetic schema replay. Identity is deliberately not a claim of a real published notice.
@@ -45,31 +45,38 @@ describe("official TED API adapter", () => {
     );
     expect(o.publishedAt).toBe("2026-10-23T00:00:00.000Z");
     expect(o.conditions.every((c) => c.field === "unknown")).toBe(true);
-    expect(o.deadline).toBeNull();
+    // This recording states lot dates but no times: the deadline is the end of the stated
+    // day in its own offset — an upper bound — and is flagged as not an exact closing time.
+    expect(o.deadline).toBe("2026-11-18T21:59:59.000Z");
+    expect(o.deadlineApproximate).toBe(true);
+    expect(o.deadlinesComplete).toBe(true);
+    expect(currentLifecycle(o, now)).toBe("open");
   });
-  it("normalises only EUR amounts, handles unambiguous zoned deadlines and leaves partial or multi-lot dates unknown", () => {
+  it("normalises only EUR amounts and reads the zoned closing instant", () => {
     const o = normalizeNotice(synthetic, now);
     expect(o.deadline).toBe("2026-11-20T09:00:00.000Z");
+    expect(o.deadlineApproximate).toBe(false);
     expect(o.value).toBe(35000);
     expect(
       normalizeNotice({ ...synthetic, "estimated-value-cur-proc": "USD" }, now)
         .value,
     ).toBeNull();
-    expect(
-      normalizeNotice(
-        {
-          ...synthetic,
-          "deadline-receipt-tender-date-lot": ["2026-11-20", "2026-12-01"],
-        },
-        now,
-      ).deadline,
-    ).toBeNull();
-    expect(
-      normalizeNotice(
-        { ...synthetic, "deadline-receipt-tender-time-lot": [] },
-        now,
-      ).deadline,
-    ).toBeNull();
+    // Lots closing at different times have no single notice-wide deadline; the set is kept
+    // and the one that matters is resolved against the clock at read time.
+    const staggered = normalizeNotice(
+      {
+        ...synthetic,
+        "deadline-receipt-tender-date-lot": ["2026-11-20+01:00", "2026-12-01+01:00"],
+        "deadline-receipt-tender-time-lot": ["10:00:00+01:00", "10:00:00+01:00"],
+      },
+      now,
+    );
+    expect(staggered.deadline).toBeNull();
+    expect(staggered.lotDeadlines).toEqual([
+      "2026-11-20T09:00:00.000Z",
+      "2026-12-01T09:00:00.000Z",
+    ]);
+    expect(effectiveDeadline(staggered, now)).toBe("2026-11-20T09:00:00.000Z");
   });
   it("sends official payload, paginates, deduplicates repeated notice identity and preserves revision history", async () => {
     const calls: { url: string; body: Record<string, unknown> }[] = [];
@@ -223,5 +230,129 @@ describe("official TED API adapter", () => {
     expect(r.status).toBe("success");
     expect(r.count).toBe(0);
     expect(allOpportunities(db)).toHaveLength(0);
+  });
+});
+
+/**
+ * Regression for the independently reported defect: a notice whose lots all closed was served
+ * as an active opportunity because a notice-wide deadline was only read when the source stated
+ * exactly one lot date and one lot time.
+ */
+describe("multi-lot deadline lifecycle", () => {
+  const lot = (dates: string[], times: string[]) => ({
+    ...synthetic,
+    "deadline-receipt-tender-date-lot": dates,
+    "deadline-receipt-tender-time-lot": times,
+  });
+  const at = (d: string) => new Date(d);
+
+  it("closes ted-654724-2026, the reported case: eleven lots sharing one past deadline", () => {
+    // Shape taken from the live notice: the same closing instant repeated once per lot.
+    const o = normalizeNotice(
+      {
+        ...synthetic,
+        "publication-number": "654724-2026",
+        "deadline-receipt-tender-date-lot": Array(11).fill("2026-10-07+02:00"),
+        "deadline-receipt-tender-time-lot": Array(11).fill("09:30:00+02:00"),
+      },
+      now,
+    );
+    expect(o.lotCount).toBe(11);
+    expect(o.lotDeadlines).toEqual(["2026-10-07T07:30:00.000Z"]);
+    expect(o.deadline).toBe("2026-10-07T07:30:00.000Z");
+    expect(o.deadlinesComplete).toBe(true);
+    expect(currentLifecycle(o, at("2026-10-25T12:00:00Z"))).toBe("deadline_passed");
+    expect(freshness({ ...o, lifecycle: "deadline_passed" }, at("2026-10-25T12:00:00Z"))).toBe(
+      "Submission deadline has passed",
+    );
+  });
+
+  it("stays open while any lot is open and reports that lot as the deadline", () => {
+    const o = normalizeNotice(
+      lot(
+        ["2026-10-01+02:00", "2026-11-30+02:00"],
+        ["09:30:00+02:00", "09:30:00+02:00"],
+      ),
+      now,
+    );
+    expect(currentLifecycle(o, at("2026-10-25T12:00:00Z"))).toBe("open");
+    // The passed lot is not what the customer can still act on.
+    expect(effectiveDeadline(o, at("2026-10-25T12:00:00Z"))).toBe("2026-11-30T07:30:00.000Z");
+  });
+
+  it("closes only once every lot has passed, and then reports when it actually closed", () => {
+    const o = normalizeNotice(
+      lot(
+        ["2026-10-01+02:00", "2026-10-09+02:00"],
+        ["09:30:00+02:00", "09:30:00+02:00"],
+      ),
+      now,
+    );
+    expect(currentLifecycle(o, at("2026-10-05T12:00:00Z"))).toBe("open");
+    expect(currentLifecycle(o, at("2026-10-25T12:00:00Z"))).toBe("deadline_passed");
+    expect(effectiveDeadline(o, at("2026-10-25T12:00:00Z"))).toBe("2026-10-09T07:30:00.000Z");
+  });
+
+  it("respects the stated offset rather than the calendar day", () => {
+    const o = normalizeNotice(lot(["2026-10-25+02:00"], ["09:30:00+02:00"]), now);
+    expect(o.deadline).toBe("2026-10-25T07:30:00.000Z");
+    expect(currentLifecycle(o, at("2026-10-25T07:29:00Z"))).toBe("open");
+    expect(currentLifecycle(o, at("2026-10-25T07:31:00Z"))).toBe("deadline_passed");
+  });
+
+  it("treats a date with no stated time as the end of that day and says so", () => {
+    const o = normalizeNotice(
+      { ...synthetic, "deadline-receipt-tender-date-lot": ["2026-10-20+02:00"], "deadline-receipt-tender-time-lot": [] },
+      now,
+    );
+    expect(o.deadline).toBe("2026-10-20T21:59:59.000Z");
+    expect(o.deadlineApproximate).toBe(true);
+    // An upper bound still closes the record once the whole day has gone.
+    expect(currentLifecycle(o, at("2026-10-20T20:00:00Z"))).toBe("open");
+    expect(currentLifecycle(o, at("2026-10-21T06:00:00Z"))).toBe("deadline_passed");
+  });
+
+  it("never infers closure from an unreadable lot set", () => {
+    const unreadable = normalizeNotice(
+      lot(["2026-10-01+02:00", "not-a-date"], ["09:30:00+02:00", "09:30:00+02:00"]),
+      now,
+    );
+    expect(unreadable.deadlinesComplete).toBe(false);
+    // One lot parsed and has passed, but the other could not be read, so it may still be open.
+    expect(currentLifecycle(unreadable, at("2026-10-25T12:00:00Z"))).toBe("unknown");
+
+    const mismatched = normalizeNotice(lot(["2026-10-01+02:00", "2026-10-02+02:00"], ["09:30:00+02:00"]), now);
+    expect(mismatched.deadlinesComplete).toBe(false);
+    expect(currentLifecycle(mismatched, at("2026-10-25T12:00:00Z"))).toBe("unknown");
+  });
+
+  it("reports no deadline at all as unknown, never as open", () => {
+    const o = normalizeNotice(
+      { ...synthetic, "deadline-receipt-tender-date-lot": [], "deadline-receipt-tender-time-lot": [] },
+      now,
+    );
+    expect(o.deadline).toBeNull();
+    expect(o.lotDeadlines).toEqual([]);
+    expect(currentLifecycle(o, now)).toBe("unknown");
+    expect(currentLifecycle(o, now)).not.toBe("open");
+  });
+
+  it("keeps supersession and result closure ahead of the deadline clock", () => {
+    const o = normalizeNotice(lot(["2026-11-30+02:00"], ["09:30:00+02:00"]), now);
+    expect(currentLifecycle({ ...o, lifecycle: "superseded" }, now)).toBe("superseded");
+    expect(currentLifecycle({ ...o, lifecycle: "result_published" }, now)).toBe("result_published");
+  });
+
+  it("parses lot entries defensively", () => {
+    expect(parseLotDeadlines(undefined, undefined)).toEqual({ values: [], lots: 0, complete: true, approximate: false });
+    expect(parseLotDeadlines("2026-10-20Z", "09:00:00Z").values).toEqual(["2026-10-20T09:00:00.000Z"]);
+    // A syntactically shaped but impossible time makes the entry unreadable, not approximate.
+    expect(parseLotDeadlines(["2026-10-20+02:00"], ["25:00:00+02:00"])).toMatchObject({
+      values: [],
+      complete: false,
+    });
+    expect(parseLotDeadlines([{ eng: "2026-10-20+02:00" }], [{ eng: "09:30:00+02:00" }]).values).toEqual([
+      "2026-10-20T07:30:00.000Z",
+    ]);
   });
 });

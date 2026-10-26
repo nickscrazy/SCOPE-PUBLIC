@@ -62,7 +62,20 @@ export type Opportunity = {
   cpv: string[];
   geography: string;
   value: number | null;
+  /**
+   * The notice-wide closing instant, when every lot shares one. Records whose lots close at
+   * different times leave this null and carry `lotDeadlines`; the deadline the customer sees
+   * is resolved at read time so a stored value cannot go stale.
+   */
   deadline: string | null;
+  /** Every distinct lot closing instant stated by the source, ascending. */
+  lotDeadlines?: string[];
+  /** How many lots the source listed a deadline for, before de-duplication. */
+  lotCount?: number;
+  /** False when a lot entry could not be read, so closure must not be inferred. */
+  deadlinesComplete?: boolean;
+  /** True when a closing instant was derived from a date with no stated time. */
+  deadlineApproximate?: boolean;
   publishedAt: string | null;
   fetchedAt: string;
   verifiedAt: string | null;

@@ -6,7 +6,10 @@ import type { Page } from "@playwright/test";
 
 const password = "Browser evidence passphrase 42";
 const OUTBOX = "./data/e2e-outbox";
-mkdirSync("evidence/release/screenshots", { recursive: true });
+// Where this run records its evidence. Defaults to the release folder; set EVIDENCE_DIR to
+// capture a later run without overwriting the evidence already published for a release.
+const EVIDENCE = process.env.EVIDENCE_DIR ?? "evidence/release";
+mkdirSync(`${EVIDENCE}/screenshots`, { recursive: true });
 function email() {
   return `review-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.test`;
 }
@@ -38,10 +41,12 @@ async function noOverflow(page: Page) {
 }
 async function screenshot(page: Page, name: string, fullPage = true) {
   await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: `evidence/release/screenshots/${name}.png`, fullPage, animations: "disabled" });
+  await page.screenshot({ path: `${EVIDENCE}/screenshots/${name}.png`, fullPage, animations: "disabled" });
 }
+// Run the operator CLI through this Node with tsx loaded, rather than through npx: npx is a
+// .cmd shim on Windows, which execFile refuses to spawn without a shell.
 const cli = (...args: string[]) =>
-  execFileSync("npx", ["tsx", "server/cli.ts", ...args], {
+  execFileSync(process.execPath, ["--import", "tsx", "server/cli.ts", ...args], {
     env: { ...process.env, APP_ENV: "staging", DATABASE_PATH: "./data/e2e.db", BASE_URL: "http://localhost:3100", LOG_LEVEL: "error" },
     encoding: "utf8",
   });
@@ -187,6 +192,10 @@ test("password recovery through the emailed link signs out every session", async
   await expect(second).toHaveURL("/app");
   await page.goto("/login");
   await page.getByRole("link", { name: "Forgotten your password?" }).click();
+  // The route changes the URL before React swaps the view in. Wait for the destination to be
+  // on screen, otherwise the field being filled is still the login form's and the value is
+  // discarded when the new form mounts.
+  await expect(page.getByRole("heading", { name: /Reset your password/ })).toBeVisible();
   await page.getByLabel("Email address").fill(address);
   await page.getByRole("button", { name: "Send reset link" }).click();
   await expect(page.getByRole("status")).toContainText("If an account uses that address");
@@ -197,6 +206,7 @@ test("password recovery through the emailed link signs out every session", async
   await second.reload();
   await expect(second).toHaveURL(/\/login/);
   await page.getByRole("link", { name: "Log in" }).click();
+  await expect(page.getByRole("heading", { name: /Back in perspective/ })).toBeVisible();
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill("A brand new browser passphrase 7");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
@@ -381,6 +391,6 @@ test("WCAG 2.1 A/AA automated audit of public and authenticated pages", async ({
     const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     report[route] = r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target) }));
   }
-  writeFileSync("evidence/release/accessibility-results.json", JSON.stringify(report, null, 2));
+  writeFileSync(`${EVIDENCE}/accessibility-results.json`, JSON.stringify(report, null, 2));
   for (const [route, violations] of Object.entries(report)) expect(violations, route).toEqual([]);
 });

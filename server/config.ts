@@ -115,6 +115,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       problems.push(
         "TRUST_PROXY must describe the TLS reverse proxy in production (e.g. 1 or loopback)",
       );
+    if (c.EDITORIAL_ALLOW_SELF_APPROVAL)
+      problems.push(
+        "EDITORIAL_ALLOW_SELF_APPROVAL cannot be enabled in production: published funding references must be attested by a second reviewer",
+      );
   }
   if (billingEnabled && c.APP_ENV !== "production" && c.STRIPE_SECRET_KEY?.startsWith("sk_live_"))
     problems.push("A Stripe live key may only be used with APP_ENV=production");
