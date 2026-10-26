@@ -133,12 +133,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1679,
+                  "duration": 1669,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:26.442Z",
+                  "startTime": "2026-10-26T18:37:51.417Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -167,12 +167,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 604,
+                  "duration": 632,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:28.221Z",
+                  "startTime": "2026-10-26T18:37:53.196Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -201,12 +201,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2453,
+                  "duration": 2656,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:28.833Z",
+                  "startTime": "2026-10-26T18:37:53.835Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -235,12 +235,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1392,
+                  "duration": 1497,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:31.293Z",
+                  "startTime": "2026-10-26T18:37:56.499Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -269,12 +269,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 694,
+                  "duration": 693,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:32.693Z",
+                  "startTime": "2026-10-26T18:37:58.004Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -303,12 +303,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 765,
+                  "duration": 802,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:33.394Z",
+                  "startTime": "2026-10-26T18:37:58.705Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -337,19 +337,19 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2619,
+                  "duration": 2742,
                   "errors": [],
                   "stdout": [],
                   "stderr": [
                     {
-                      "text": "(node:29840) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+                      "text": "(node:4220) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
                     },
                     {
-                      "text": "(node:4564) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+                      "text": "(node:27704) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
                     }
                   ],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:34.168Z",
+                  "startTime": "2026-10-26T18:37:59.515Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -378,12 +378,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1348,
+                  "duration": 1402,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:36.796Z",
+                  "startTime": "2026-10-26T18:38:02.266Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -412,12 +412,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4693,
+                  "duration": 4934,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:38.151Z",
+                  "startTime": "2026-10-26T18:38:03.675Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -446,12 +446,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5157,
+                  "duration": 5308,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-10-26T18:27:42.855Z",
+                  "startTime": "2026-10-26T18:38:08.619Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -469,8 +469,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-10-26T18:27:24.000Z",
-    "duration": 24326.994000000002,
+    "startTime": "2026-10-26T18:37:49.051Z",
+    "duration": 25203.067000000003,
     "expected": 10,
     "skipped": 0,
     "unexpected": 0,

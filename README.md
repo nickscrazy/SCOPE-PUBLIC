@@ -2,15 +2,17 @@
 
 Public tenders and government funding for Maltese SMEs, ranked against what a business actually does, with the official source and the unknowns shown for every match.
 
-**Release status: `BETA_READY_WITH_BLOCKERS`** — see [RELEASE_REPORT.md](RELEASE_REPORT.md). The software is complete and tested for the Free/trial product; public launch still needs external items (legal operator, SMTP provider, independent security review, and — for paid plans — a live Stripe account). Nothing has been publicly deployed and no live payment or customer email has been sent.
+**Release status: `BETA_READY_WITH_BLOCKERS`** — see [RELEASE_REPORT.md](RELEASE_REPORT.md), and [REPAIR_REPORT.md](REPAIR_REPORT.md) for the two P1 defects an independent review found in `e89af21` and how they were repaired. The software is complete and tested for the Free/trial product; public launch still needs external items (legal operator, SMTP provider, independent security review, and — for paid plans — a live Stripe account). Nothing has been publicly deployed and no live payment or customer email has been sent.
 
 | Document | Purpose |
 | --- | --- |
+| [REPAIR_REPORT.md](REPAIR_REPORT.md) | **Latest:** repairs made after the independent review — both P1 defects, before/after reproductions, deferred debt |
 | [RELEASE_REPORT.md](RELEASE_REPORT.md) | Independent review of the Codex build, repairs, executed evidence, verdict, launch steps |
 | [RUNBOOK.md](RUNBOOK.md) | Deploy, configure, monitor, back up, restore, upgrade, roll back |
 | [SECURITY.md](SECURITY.md) | Threat model, controls, residual risks, items needing external review |
 | [HANDOFF.md](HANDOFF.md) | Brief for an independent Codex security and functional review |
-| [evidence/release/](evidence/release/) | Raw output of every check in this release, screenshots |
+| [evidence/repairs/](evidence/repairs/) | Evidence for the repair round: browser results, accessibility audit, screenshots |
+| [evidence/release/](evidence/release/) | Raw output of every check in the `e89af21` release, screenshots |
 | [evidence/codex-baseline/](evidence/codex-baseline/) | Codex's original evidence, `BUILD_REPORT.md` and `NEXT_STEPS.md`, unmodified |
 
 ## Run locally
@@ -70,7 +72,7 @@ Separately: **eligibility** summarises explicit source conditions (any `unmet` i
 
 ```bash
 npm run lint && npm run typecheck
-npm test                     # 81 unit/integration/adversarial tests
+npm test                     # 96 unit/integration/adversarial tests
 npm run build
 npm run test:e2e             # 10 Chromium scenarios on the production build (+ axe audit)
 npm run smoke:prod           # production process boot, verification, restart persistence

@@ -49,6 +49,59 @@ Read [RELEASE_REPORT.md](RELEASE_REPORT.md) §2 (findings) and [SECURITY.md](SEC
 4. Walk every customer journey on a phone-sized viewport and with keyboard only.
 5. Check that no UI implies eligibility, official affiliation, complete coverage or a purchasable plan when billing is disabled.
 
+## Focused re-review of the repair round
+
+**Commit under review: `46c5c17`** on `claude/review-repairs-p1-p2`, parent `e89af21`.
+Everything in this round is in that one commit. Start with [REPAIR_REPORT.md](REPAIR_REPORT.md).
+
+```bash
+git diff e89af21..46c5c17 --stat
+npm ci && npm run lint && npm run typecheck && npm test && npm run build
+npm run test:e2e                      # runs on Windows and Linux
+docker build -t scope:rc . && npx tsx scripts/container-test.ts
+```
+
+What to attack first, with the exact claims being made:
+
+| Claim | Where to attack it |
+| --- | --- |
+| A notice is closed only once **every** lot has passed, and an unreadable lot set never closes a record | `server/ted.ts` `parseLotDeadlines`, `server/matching.ts` `currentLifecycle`. Try mismatched array lengths, missing times, non-UTC offsets, a lot set where one entry is junk, and a notice that gains a lot on re-import |
+| No stored value goes stale: the deadline shown is resolved at read time | `effectiveDeadline` and `ranked()` in `server/routes-opportunities.ts`. Check a record stored months ago whose next lot has since passed |
+| The correct password is never refused or delayed by throttling | `server/routes-account.ts` `/auth/login`. Try to deny a known address access from another client, with and without `TRUST_PROXY`, and across the window boundary |
+| Guessing is still constrained | Same place. Measure how many guesses one client gets per window, and whether a successful sign-in to *another* account resets a client's failure budget |
+| `X-Forwarded-For` buys nothing unless `TRUST_PROXY` is set | `server/context.ts` `limited`, and the limiter keys |
+| An image built from a Windows checkout starts | Clone with `core.autocrlf=true`, build, run. `.gitattributes` is the control |
+| One unreadable notice does not lose the window, but a schema break still fails the run | `syncTed` in `server/ted.ts`; feed it a page where every notice is malformed, and one where a single notice is |
+
+Known and deliberate, please do not re-report as new: the deferred items listed in
+[REPAIR_REPORT.md](REPAIR_REPORT.md), and the residual risks in [SECURITY.md](SECURITY.md) —
+in particular that account-level guessing is now slowed rather than hard-capped, which is the
+trade that removes the lockout.
+
+### Rolling back this round
+
+The commit is additive and touches no migration, so reverting is safe and needs no data work:
+
+```bash
+git revert --no-commit 46c5c17 && git commit -m "Revert repair round"
+# or, to return to the reviewed baseline exactly:
+git checkout e89af21
+npm ci && npm run build
+```
+
+No schema change was made: `server/migrations/` is untouched (`001`, `002`, as before), so a
+database written by `46c5c17` is readable by `e89af21` and the reverse. The four lifecycle
+fields added to stored records (`lotDeadlines`, `lotCount`, `deadlinesComplete`,
+`deadlineApproximate`) live inside the existing JSON payload and are ignored by the older code,
+which falls back to the stored `deadline`. This was checked rather than assumed: 120 records
+written by the repaired code were read back through the baseline's own `currentLifecycle`,
+verbatim from `e89af21` — all 120 parsed, none threw. Reverting therefore restores the previous
+behaviour, including the two defects.
+
+The first TED sync after deploying `46c5c17` rewrites every TED record once, because the
+interpretation of the source changed and the content hash changes with it. That is expected:
+it writes one new version row per notice and reports a large `changed` count on that run only.
+
 ## Known gaps (do not report as new)
 
 Stripe never exercised live; no real SMTP provider; operator legal identity not configured; ePPS not covered; TED selection criteria not parsed (conditions stay `unknown`); funding catalogue has 3 references; no MFA; registration reveals existing emails (409); single-instance SQLite.
